@@ -1,0 +1,44 @@
+<configuration>
+    <!-- Console Appender with Enhanced Format -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- Enhanced pattern showing:
+                 - Timestamp with milliseconds
+                 - Thread name (important for coroutines)
+                 - Thread ID 
+                 - Log level (colored)
+                 - Logger name (shortened)
+                 - Caller location (class:line)
+                 - MDC context (for coroutine context)
+                 - Message
+            -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%thread] [tid:%tid] %cyan(%logger{35}) %magenta(%C{1}:%L) %green([%X{sessionId}%X{coroutineId}]) - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Alternative: More Detailed Format with Method Names -->
+    <appender name="STDOUT_DETAILED" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%boldYellow(%thread)] [tid:%tid] %cyan(%logger{30}) %green([%X{sessionId}]) %magenta(%M\\(%C{1}.kt:%L\\)) - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Alternative: Compact Format -->
+    <appender name="STDOUT_COMPACT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%boldYellow(%thread)] %cyan(%-30logger{30}) - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+    
+    <!-- Set DEBUG level for your application to see detailed logs -->
+    <logger name="com.jh.proj" level="DEBUG"/>
+    
+    <!-- Keep external libraries quieter -->
+    <logger name="org.eclipse.jetty" level="INFO"/>
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.ktor" level="INFO"/>
+</configuration>
