@@ -31,7 +31,7 @@ class VizEventMain {
         val exampleDelay = 1000L
 
         val scope = VizScope(session)
-        val job = scope.vizLaunch("parent") {
+        scope.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Starting child launches...")
             vizLaunch("child-1") {
                 logger.info("🌱 Child-1: Running for ${exampleDelay}ms...")
@@ -41,7 +41,6 @@ class VizEventMain {
             logger.info("🎉 Parent: Completed")
         }
 
-        job.join()
         delay(1001)
         val eventLogExcepted = setOf("parent", "child-1")
         val expected = eventLogExcepted.all { eventLog.contains(it) }
@@ -74,7 +73,7 @@ class VizEventMain {
         val exampleDelay = 1600L
 
         val scope = VizScope(session)
-        val job = scope.vizLaunch("parent") {
+        scope.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Launching children in parallel...")
             vizLaunch("child-1") {
                 logger.info("🌿 Child-1: Starting 1s task...")
@@ -90,7 +89,6 @@ class VizEventMain {
 
         }
 
-        job.join()
         delay(exampleDelay)
         val eventLogExcepted = setOf("parent", "child-1", "child-2")
         val expected = eventLogExcepted.all { eventLog.contains(it) }
@@ -114,11 +112,11 @@ class VizEventMain {
         // Subscribe to live events
         val live = launch {
             session.bus.stream().collect { event ->
-              //  logger.info("LIVE: $event")
+                //  logger.info("LIVE: $event")
                 when (event.kind) {
                     "CoroutineCompleted" -> {
                         eventLog.add(event.getLabel() ?: "unknown")
-            //            logger.info("📡 EVENT: ${event.kind} | ${event.seq} | $event")
+                        //            logger.info("📡 EVENT: ${event.kind} | ${event.seq} | $event")
                     }
                 }
             }
@@ -127,7 +125,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         // Launch the visualization hierarchy - runs independently of main2's scope
-        val job = viz.vizLaunch("parent") {
+        viz.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Building nested tree...")
             vizLaunch("child-1") {
                 logger.info("🌿 Child-1: Starting and spawning grandchild...")
@@ -154,7 +152,6 @@ class VizEventMain {
         }
 
         // Wait for the scenario to complete
-        job.join()
         delay(5000)
         val eventLogExpected = setOf("parent", "child-2-1", "child-2", "child-1", "child-1-1")
         val expected = eventLogExpected.all { eventLog.contains(it) }
@@ -194,7 +191,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         // Launch parent that creates async tasks
-        val job = viz.vizLaunch("parent") {
+        viz.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Starting async tasks...")
 
             // Create multiple async tasks
@@ -281,7 +278,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         try {
-            val job = viz.vizLaunch("parent") {
+             viz.vizLaunch("parent") {
                 logger.info("👨‍👧‍👦 Parent: Launching children...")
 
                 // Child 1: Long-running, should be cancelled when child 2 fails
@@ -392,7 +389,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         try {
-            val job = viz.vizLaunch("parent") {
+             viz.vizLaunch("parent") {
                 logger.info("👨‍👧‍👦 Parent: Starting mixed scenario...")
 
                 // Launch a regular coroutine
@@ -471,7 +468,7 @@ class VizEventMain {
 
         val viz = VizScope(session)
 
-        val job = viz.vizLaunch("parent") {
+         viz.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Creating shared async task...")
 
             // Create ONE async task
