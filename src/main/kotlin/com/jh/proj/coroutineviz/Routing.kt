@@ -35,7 +35,7 @@ fun Application.configureRouting() {
         }
 
         // Run VizEventMain scenario and return results
-        get("/api/viz/run-scenario") {
+        get("/api/viz/nested-launch-scenario") {
             logger.info("┌─────────────────────────────────────────┐")
             logger.info("│  Starting VizEventMain Scenario        │")
             logger.info("└─────────────────────────────────────────┘")
@@ -46,7 +46,77 @@ fun Application.configureRouting() {
                 logger.debug("VizEventMain instance created, executing main()")
 
                 // Run the scenario
-                vizMain.main2()
+                vizMain.exampleOfNestedLaunches()
+
+                logger.info("✅ VizEventMain scenario completed successfully")
+
+                // Return success response
+                call.respond(
+                    HttpStatusCode.OK,
+                    ScenarioResponse(
+                        success = true,
+                        message = "Scenario executed successfully. Check server logs for output."
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("❌ Error executing VizEventMain scenario", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ScenarioResponse(
+                        success = false,
+                        message = "Error executing scenario: ${e.message}"
+                    )
+                )
+            }
+        }
+
+        get("/api/viz/one-launch-scenario") {
+            logger.info("┌─────────────────────────────────────────┐")
+            logger.info("│  Starting VizEventMain Scenario        │")
+            logger.info("└─────────────────────────────────────────┘")
+
+            try {
+                val vizMain = VizEventMain()
+
+                logger.debug("VizEventMain instance created, executing main()")
+
+                // Run the scenario
+                vizMain.exampleSimpleLaunchVisualization()
+
+                logger.info("✅ VizEventMain scenario completed successfully")
+
+                // Return success response
+                call.respond(
+                    HttpStatusCode.OK,
+                    ScenarioResponse(
+                        success = true,
+                        message = "Scenario executed successfully. Check server logs for output."
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("❌ Error executing VizEventMain scenario", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ScenarioResponse(
+                        success = false,
+                        message = "Error executing scenario: ${e.message}"
+                    )
+                )
+            }
+        }
+
+        get("/api/viz/two-launch-scenario") {
+            logger.info("┌─────────────────────────────────────────┐")
+            logger.info("│  Starting VizEventMain Scenario        │")
+            logger.info("└─────────────────────────────────────────┘")
+
+            try {
+                val vizMain = VizEventMain()
+
+                logger.debug("VizEventMain instance created, executing main()")
+
+                // Run the scenario
+                vizMain.exampleOfTwoLanuches()
 
                 logger.info("✅ VizEventMain scenario completed successfully")
 
@@ -78,7 +148,7 @@ fun Application.configureRouting() {
             logger.info("Running Test: Basic vizAsync")
             try {
                 val vizMain = VizEventMain()
-                vizMain.testAsyncBasic()
+                vizMain.exampleOfTwoAsyncs()
                 call.respond(HttpStatusCode.OK, ScenarioResponse(
                     success = true,
                     message = "✅ Test completed! Check logs for details."
