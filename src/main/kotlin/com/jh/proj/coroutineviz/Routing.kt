@@ -508,8 +508,7 @@ fun Application.configureRouting() {
             logger.info("Running nested coroutines scenario in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runNestedCoroutines(session)
-                job.join()
+                ScenarioRunner.runNestedCoroutines(session)
                 
                 // Small delay to ensure all events are processed
                 delay(100)
@@ -541,8 +540,7 @@ fun Application.configureRouting() {
             logger.info("Running parallel execution scenario in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runParallelExecution(session)
-                job.join()
+                ScenarioRunner.runParallelExecution(session)
                 delay(100)
 
                 call.respond(
@@ -572,8 +570,7 @@ fun Application.configureRouting() {
             logger.info("Running cancellation scenario in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runCancellationScenario(session)
-                job.join()
+                ScenarioRunner.runCancellationScenario(session)
                 delay(100)
 
                 call.respond(
@@ -604,8 +601,7 @@ fun Application.configureRouting() {
             logger.info("Running deep nesting scenario (depth=$depth) in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runDeepNesting(session, depth)
-                job.join()
+                ScenarioRunner.runDeepNesting(session, depth)
                 delay(100)
 
                 call.respond(
@@ -635,8 +631,7 @@ fun Application.configureRouting() {
             logger.info("Running mixed scenario in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runMixedScenario(session)
-                job.join()
+                ScenarioRunner.runMixedScenario(session)
                 delay(100)
 
                 call.respond(
@@ -666,8 +661,7 @@ fun Application.configureRouting() {
             logger.info("Running exception scenario in session: ${session.sessionId}")
 
             try {
-                val job = ScenarioRunner.runExceptionScenario(session)
-                job.join()
+                ScenarioRunner.runExceptionScenario(session)
                 delay(100)
 
                 call.respond(
@@ -708,8 +702,7 @@ fun Application.configureRouting() {
                 val scenarioConfig = request.toScenarioConfig()
                 
                 // Execute the custom scenario
-                val job = ScenarioRunner.runCustomScenario(session, scenarioConfig)
-                job.join()
+                ScenarioRunner.runCustomScenario(session, scenarioConfig)
                 
                 // Small delay to ensure all events are processed
                 delay(100)
