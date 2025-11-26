@@ -27,17 +27,17 @@ object ScenarioRunner {
                 
                 vizLaunch("child-1-1") {
                     logger.debug("Child-1-1 started")
-                    vizDelay(2000)
+                    vizDelay(5000)
                     logger.debug("Child-1-1 completed")
                 }
                 
-                vizDelay(1500)
+                vizDelay(2000)
                 logger.debug("Child-1 completed")
             }
             
             vizLaunch("child-2") {
                 logger.debug("Child-2 started")
-                vizDelay(1500)
+                vizDelay(4000)
                 logger.debug("Child-2 completed")
             }
             

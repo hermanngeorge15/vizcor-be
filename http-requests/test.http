@@ -1,10 +1,10 @@
-GET http://localhost:8080/api/viz/run-scenario
+GET http://localhost:8080/api/viz/one-launch-scenario
 
 ###
-GET http://localhost:8080/api/tests/async-basic
+GET http://localhost:8080/api/viz/two-launch-scenario
 
 ###
-GET http://localhost:8080/api/tests/exception-propagation
+GET http://localhost:8080/api/viz/nested-launch-scenario
 
 ###
 GET http://localhost:8080/api/viz/run-scenario
