@@ -5,6 +5,7 @@ import com.jh.proj.coroutineviz.session.VizSession
 import com.jh.proj.coroutineviz.wrappers.VizScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
 import org.slf4j.LoggerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +45,7 @@ class StructuredConcurrencyTest {
      * - Event order: Child events before parent completion
      */
     @Test
-    fun `test basic structured concurrency - parent waits for children`() = kotlinx.coroutines.runBlocking {
+    fun `test basic structured concurrency - parent waits for children`() = runTest {
         logger.info("=".repeat(60))
         logger.info("TEST 1: Basic Structured Concurrency - Parent Waits")
         logger.info("=".repeat(60))

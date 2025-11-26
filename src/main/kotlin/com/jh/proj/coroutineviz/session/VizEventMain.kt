@@ -81,13 +81,22 @@ class VizEventMain {
 
         liveLogger.cancel()
     }
+    private fun com.jh.proj.coroutineviz.events.VizEvent.getLabel(): String? =
+        (this as? com.jh.proj.coroutineviz.events.CoroutineEvent)?.label
 
     suspend fun main2() = coroutineScope {
         val session = VizSession("session-A")
 
+
+        val eventLog = mutableListOf<String>()
         // Subscribe to live events
         val live = launch {
-            session.bus.stream().collect { logger.info("LIVE: $it") }
+            session.bus.stream().collect { event ->
+                logger.info("LIVE: $event")
+                when (event.kind) {
+                    "CoroutineCompleted" -> eventLog.add(event.getLabel() ?: "unknown")
+                }
+            }
         }
 
         // Create an independent VizScope
@@ -96,7 +105,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         // Launch the visualization hierarchy - runs independently of main2's scope
-        viz.vizLaunch("parent")   {
+        val job = viz.vizLaunch("parent")   {
             vizLaunch("child-1") {
                 vizLaunch("child-1-1") {
                     println("vizLaunch1")
@@ -116,11 +125,11 @@ class VizEventMain {
         }
 
         // Wait for the scenario to complete
-//        job.join()
-
-        // Give time for all events to propagate
-//        delay(3000)
+        job.join()
         delay(5000)
+        val eventLogExpected = setOf("parent","child-2-1","child-2","child-1","child-1-1")
+        val expected = eventLogExpected.all { eventLog.contains(it) }
+        logger.info("eventLogExpected = $expected")
         logger.info("=== SNAPSHOT ===")
         session.snapshot.coroutines.values.forEach { logger.info(it.toString()) }
 
