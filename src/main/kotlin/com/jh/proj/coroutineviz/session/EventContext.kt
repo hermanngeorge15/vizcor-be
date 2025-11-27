@@ -114,7 +114,8 @@ fun EventContext.coroutineFailed(
 
 fun EventContext.coroutineSuspended(
     reason: String,
-    durationMillis: Long? = null
+    durationMillis: Long? = null,
+    suspensionPoint: SuspensionPoint? = null,
 ): CoroutineSuspended = CoroutineSuspended(
     sessionId = sessionId,
     seq = nextSeq(),
@@ -125,7 +126,8 @@ fun EventContext.coroutineSuspended(
     scopeId = scopeId,
     label = label,
     reason = reason,
-    durationMillis = durationMillis
+    durationMillis = durationMillis,
+    suspensionPoint = suspensionPoint,
 )
 
 fun EventContext.coroutineResumed(): CoroutineResumed = CoroutineResumed(

@@ -3,6 +3,7 @@ package com.jh.proj.coroutineviz.session
 import com.jh.proj.coroutineviz.extension.getLabel
 import com.jh.proj.coroutineviz.wrappers.VizDispatchers
 import com.jh.proj.coroutineviz.wrappers.VizScope
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -277,43 +278,44 @@ class VizEventMain {
 
         val viz = VizScope(session)
 
-        try {
-             viz.vizLaunch("parent") {
-                logger.info("👨‍👧‍👦 Parent: Launching children...")
+        val parentName = "parent"
+        val launchLongRunningTaskName = "child-1-long-running"
+        val vizLaunch2ExceptionName = "child-2-will-fail"
 
-                // Child 1: Long-running, should be cancelled when child 2 fails
-                vizLaunch("child-1-long-running") {
-                    logger.info("👶 Child-1: Started, will run for 5 seconds...")
-                    try {
-                        vizDelay(5000)
-                        logger.info("👶 Child-1: Completed successfully (THIS SHOULD NOT PRINT!)")
-                    } catch (e: Exception) {
-                        logger.warn("👶 Child-1: Cancelled due to sibling failure: ${e.message}")
-                        throw e
-                    }
+        viz.vizLaunch(parentName) {
+            logger.info("👨‍👧‍👦 Parent: Launching children...")
+
+            // Child 1: Long-running, should be cancelled when child 2 fails
+            vizLaunch(launchLongRunningTaskName) {
+                logger.info("👶 Child-1: Started, will run for 5 seconds...")
+                try {
+                    vizDelay(5000)
+                    logger.info("👶 Child-1: Completed successfully (THIS SHOULD NOT PRINT!)")
+                } catch (e: Exception) {
+                    logger.warn("👶 Child-1: Cancelled due to sibling failure: ${e.message}")
+                    throw e
                 }
-
-                // Small delay to ensure child-1 starts
-                vizDelay(100)
-
-                // Child 2: Will fail after 500ms
-                vizLaunch("child-2-will-fail") {
-                    logger.info("👶 Child-2: Started, will fail in 500ms...")
-                    vizDelay(500)
-                    logger.error("👶 Child-2: Throwing exception NOW!")
-                    throw RuntimeException("Child-2 intentional failure for testing!")
-                }
-
-                logger.info("👨‍👧‍👦 Parent: Waiting for children... (THIS SHOULD NOT COMPLETE)")
             }
 
-            // Wait and observe
-            delay(3000)
-            logger.info("⏰ Main: Waited 3 seconds")
+            // Small delay to ensure child-1 starts
+            vizDelay(100)
 
-        } catch (e: Exception) {
-            logger.error("❌ Main: Caught exception from parent job: ${e.message}")
+            // Child 2: Will fail after 500ms
+
+            vizLaunch(vizLaunch2ExceptionName) {
+                logger.info("👶 Child-2: Started, will fail in 500ms...")
+                vizDelay(500)
+                logger.error("👶 Child-2: Throwing exception NOW! $vizLaunch2ExceptionName")
+                throw RuntimeException("Child-2 intentional failure for testing! $vizLaunch2ExceptionName")
+            }
+
+            logger.info("👨‍👧‍👦 Parent: Waiting for children... (THIS SHOULD NOT COMPLETE)")
         }
+
+        // Wait and observe
+        delay(3000)
+        logger.info("⏰ Main: Waited 3 seconds")
+
 
         logger.info("\n" + "=".repeat(60))
         logger.info("FINAL SNAPSHOT - Verify Cancellation Propagation:")
@@ -389,7 +391,7 @@ class VizEventMain {
         val viz = VizScope(session)
 
         try {
-             viz.vizLaunch("parent") {
+            viz.vizLaunch("parent") {
                 logger.info("👨‍👧‍👦 Parent: Starting mixed scenario...")
 
                 // Launch a regular coroutine
@@ -468,7 +470,7 @@ class VizEventMain {
 
         val viz = VizScope(session)
 
-         viz.vizLaunch("parent") {
+        viz.vizLaunch("parent") {
             logger.info("👨‍👧‍👦 Parent: Creating shared async task...")
 
             // Create ONE async task
