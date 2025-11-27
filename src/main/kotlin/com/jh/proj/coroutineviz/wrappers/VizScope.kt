@@ -1,30 +1,28 @@
 package com.jh.proj.coroutineviz.wrappers
 
-import com.jh.proj.coroutineviz.events.CoroutineBodyCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCancelled
-import com.jh.proj.coroutineviz.events.CoroutineCompleted
-import com.jh.proj.coroutineviz.events.CoroutineFailed
-import com.jh.proj.coroutineviz.events.CoroutineSuspended
 import com.jh.proj.coroutineviz.events.DeferredValueAvailable
 import com.jh.proj.coroutineviz.events.InstrumentedDeferred
 import com.jh.proj.coroutineviz.events.SuspensionPoint
 import com.jh.proj.coroutineviz.events.ThreadAssigned
 import com.jh.proj.coroutineviz.session.EventContext
 import com.jh.proj.coroutineviz.session.VizSession
+import com.jh.proj.coroutineviz.session.coroutineBodyCompleted
+import com.jh.proj.coroutineviz.session.coroutineCancelled
+import com.jh.proj.coroutineviz.session.coroutineCompleted
 import com.jh.proj.coroutineviz.session.coroutineCreated
+import com.jh.proj.coroutineviz.session.coroutineFailed
 import com.jh.proj.coroutineviz.session.coroutineResumed
 import com.jh.proj.coroutineviz.session.coroutineStarted
+import com.jh.proj.coroutineviz.session.coroutineSuspended
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.*
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -49,7 +47,6 @@ class VizScope(
     val scopeId: String = "scope-${session.nextSeq()}"
 ) : CoroutineScope {
 
-    // Independent scope - not tied to caller's scope
     override val coroutineContext: CoroutineContext = context + CoroutineName("VizScope-$scopeId")
 
     /**
@@ -97,12 +94,19 @@ class VizScope(
             label = label
         )
 
+        // Check if we're in a nested context (inside another vizLaunch/vizAsync)
+        // If so, use current scope; otherwise use VizScope
+        val targetScope = currentCoroutineContext()[VizCoroutineElement]?.let {
+            CoroutineScope(currentCoroutineContext())
+        } ?: this
+
+
         // Launch with the viz element in context
-        val job = this.launch(context + vizElement) {
-            // ✅ EMIT: CoroutineCreated - clean DSL
+        val job = targetScope.launch(context + vizElement) {
+            // ✅ EMIT: CoroutineCreated
             session.send(ctx.coroutineCreated())
 
-            // ✅ EMIT: CoroutineStarted - clean DSL
+            // ✅ EMIT: CoroutineStarted
             session.send(ctx.coroutineStarted())
 
             // EMIT: ThreadAssigned
@@ -124,21 +128,9 @@ class VizScope(
 
             block()
 
-
             // Emit CoroutineBodyCompleted - the coroutine's own code has finished
             // AND all children have completed (due to coroutineScope above)
-            session.sent(
-                CoroutineBodyCompleted(
-                    sessionId = session.sessionId,
-                    seq = session.nextSeq(),
-                    tsNanos = System.nanoTime(),
-                    coroutineId = coroutineId,
-                    jobId = jobId,
-                    parentCoroutineId = parentCoroutineId,
-                    scopeId = scopeId,
-                    label = label
-                )
-            )
+            session.sent(ctx.coroutineBodyCompleted())
 
         }
 
@@ -151,78 +143,37 @@ class VizScope(
             // invokeOnCompletion is NOT a suspend function, but session.send() is also NOT suspend!
             // We can call it directly without launching a coroutine
             // Only emit terminal event if we haven't already emitted one
-//            if (!bodyTerminalEventEmitted.get()) {
             when {
                 cause == null -> {
                     // Normal completion - body finished and all children completed successfully
                     session.send(
-                        CoroutineCompleted(
-                            sessionId = session.sessionId,
-                            seq = session.nextSeq(),
-                            tsNanos = System.nanoTime(),
-                            coroutineId = coroutineId,
-                            jobId = jobId,
-                            parentCoroutineId = parentCoroutineId,
-                            scopeId = scopeId,
-                            label = label
-                        )
+                        ctx.coroutineCompleted()
                     )
                 }
 
-                cause is CancellationException -> {
+                cause !is CancellationException && cause.message?.contains(ctx.label ?: "unknown") == true -> {
+                    // Failure - own code threw an exception
+                    // Note: In practice, this rarely happens because coroutineScope
+                    // converts exceptions to CancellationException
+                    session.send(ctx.coroutineFailed(cause::class.simpleName, cause.message))
+                }
+
+                cause is CancellationException || job.isCancelled -> {
                     // Cancellation - could be:
                     // - Child failed (structured concurrency cancellation)
                     // - Explicit cancellation
                     // - Parent cancelled
-                    session.send(
-                        CoroutineCancelled(
-                            sessionId = session.sessionId,
-                            seq = session.nextSeq(),
-                            tsNanos = System.nanoTime(),
-                            coroutineId = coroutineId,
-                            jobId = jobId,
-                            parentCoroutineId = parentCoroutineId,
-                            scopeId = scopeId,
-                            label = label,
-                            cause = cause.message ?: "Cancelled"
-                        )
-                    )
+                    session.send(ctx.coroutineCancelled(cause.message ?: "CancellationException"))
                 }
 
                 else -> {
                     // Failure - own code threw an exception
                     // Note: In practice, this rarely happens because coroutineScope
                     // converts exceptions to CancellationException
-                    session.send(
-                        CoroutineFailed(
-                            sessionId = session.sessionId,
-                            seq = session.nextSeq(),
-                            tsNanos = System.nanoTime(),
-                            coroutineId = coroutineId,
-                            jobId = jobId,
-                            parentCoroutineId = parentCoroutineId,
-                            scopeId = scopeId,
-                            label = label,
-                            exceptionType = cause::class.simpleName ?: "Unknown",
-                            message = cause.message,
-                            stackTrace = cause.stackTrace.take(10).map { it.toString() }
-                        )
-                    )
+                    throw IllegalArgumentException("It is not correct state")
                 }
             }
-//            }
         }
-
-//        // Wrap the job with VizJob for operation tracking
-//        return job.toVizJob(
-//            session = session,
-//            coroutineId = coroutineId,
-//            jobId = jobId,
-//            parentCoroutineId = parentCoroutineId,
-//            scopeId = scopeId,
-//            label = label
-//        )
-
         return job
     }
 
@@ -255,9 +206,6 @@ class VizScope(
             label = label
         )
 
-        // Track terminal events (similar to vizLaunch)
-        val bodyTerminalEventEmitted = AtomicBoolean(false)
-
         // Check if we're in a nested context (inside another vizLaunch/vizAsync)
         // If so, use current scope; otherwise use VizScope
         val targetScope = currentCoroutineContext()[VizCoroutineElement]?.let {
@@ -285,107 +233,66 @@ class VizScope(
                     dispatcherName = coroutineContext[ContinuationInterceptor]?.toString() ?: "Unknown"
                 )
             )
+            // Execute block
+            val result = block()
 
-            try {
-                // Execute block in a coroutineScope to ensure structured concurrency
-                val result = kotlinx.coroutines.coroutineScope {
-                    block()
-                }
+            // Emit body completed
+            session.sent(
+                ctx.coroutineBodyCompleted()
+            )
 
-                // Emit body completed
-                session.sent(
-                    CoroutineBodyCompleted(
-                        sessionId = session.sessionId,
-                        seq = session.nextSeq(),
-                        tsNanos = System.nanoTime(),
-                        coroutineId = coroutineId,
-                        jobId = jobId,
-                        parentCoroutineId = parentCoroutineId,
-                        scopeId = scopeId,
-                        label = label
-                    )
+            // Emit deferred value available
+            session.sent(
+                DeferredValueAvailable(
+                    sessionId = session.sessionId,
+                    seq = session.nextSeq(),
+                    tsNanos = System.nanoTime(),
+                    coroutineId = coroutineId,
+                    jobId = jobId,
+                    parentCoroutineId = parentCoroutineId,
+                    scopeId = scopeId,
+                    label = label,
+                    deferredId = deferredId
                 )
+            )
 
-                // Emit deferred value available
-                session.sent(
-                    DeferredValueAvailable(
-                        sessionId = session.sessionId,
-                        seq = session.nextSeq(),
-                        tsNanos = System.nanoTime(),
-                        coroutineId = coroutineId,
-                        jobId = jobId,
-                        parentCoroutineId = parentCoroutineId,
-                        scopeId = scopeId,
-                        label = label,
-                        deferredId = deferredId
-                    )
-                )
-
-                result
-
-            } catch (e: Throwable) {
-                // Same as vizLaunch: let invokeOnCompletion handle terminal event emission
-                throw e
-            }
+            result
         }
 
         // Register completion handler (same logic as vizLaunch)
         // session.send() is NOT suspend, so we can call it directly
         deferred.invokeOnCompletion { cause ->
+            // invokeOnCompletion is NOT a suspend function, but session.send() is also NOT suspend!
+            // We can call it directly without launching a coroutine
             // Only emit terminal event if we haven't already emitted one
-            if (!bodyTerminalEventEmitted.get()) {
-                when {
-                    cause == null -> {
-                        // Normal completion
-                        session.send(
-                            CoroutineCompleted(
-                                sessionId = session.sessionId,
-                                seq = session.nextSeq(),
-                                tsNanos = System.nanoTime(),
-                                coroutineId = coroutineId,
-                                jobId = jobId,
-                                parentCoroutineId = parentCoroutineId,
-                                scopeId = scopeId,
-                                label = label
-                            )
-                        )
-                    }
+            when {
+                cause == null -> {
+                    // Normal completion - body finished and all children completed successfully
+                    session.send(
+                        ctx.coroutineCompleted()
+                    )
+                }
 
-                    cause is CancellationException -> {
-                        // Cancellation (child failed, explicit cancellation, etc.)
-                        session.send(
-                            CoroutineCancelled(
-                                sessionId = session.sessionId,
-                                seq = session.nextSeq(),
-                                tsNanos = System.nanoTime(),
-                                coroutineId = coroutineId,
-                                jobId = jobId,
-                                parentCoroutineId = parentCoroutineId,
-                                scopeId = scopeId,
-                                label = label,
-                                cause = cause.message ?: "Cancelled"
-                            )
-                        )
-                    }
+                cause !is CancellationException && cause.message?.contains(ctx.label ?: "unknown") == true -> {
+                    // Failure - own code threw an exception
+                    // Note: In practice, this rarely happens because coroutineScope
+                    // converts exceptions to CancellationException
+                    session.send(ctx.coroutineFailed(cause::class.simpleName, cause.message))
+                }
 
-                    else -> {
-                        // Failure - own code threw an exception
-                        session.send(
-                            CoroutineFailed(
-                                sessionId = session.sessionId,
-                                seq = session.nextSeq(),
-                                tsNanos = System.nanoTime(),
-                                coroutineId = coroutineId,
-                                jobId = jobId,
-                                parentCoroutineId = parentCoroutineId,
-                                scopeId = scopeId,
-                                label = label,
-                                exceptionType = cause::class.simpleName ?: "Unknown",
-                                message = cause.message,
-                                stackTrace = cause.stackTrace.take(10).map { it.toString() }
-                            )
-                        )
-                    }
+                cause is CancellationException || deferred.isCancelled -> {
+                    // Cancellation - could be:
+                    // - Child failed (structured concurrency cancellation)
+                    // - Explicit cancellation
+                    // - Parent cancelled
+                    session.send(ctx.coroutineCancelled(cause.message ?: "CancellationException"))
+                }
+
+                else -> {
+                    // Failure - own code threw an exception
+                    // Note: In practice, this rarely happens because coroutineScope
+                    // converts exceptions to CancellationException
+                    throw IllegalArgumentException("It is not correct state")
                 }
             }
         }
@@ -422,19 +329,7 @@ class VizScope(
 
             // Emit suspension with detailed info
             session.sent(
-                CoroutineSuspended(
-                    sessionId = session.sessionId,
-                    seq = session.nextSeq(),
-                    tsNanos = System.nanoTime(),
-                    coroutineId = coroutineElement.coroutineId,
-                    jobId = coroutineElement.jobId,
-                    parentCoroutineId = coroutineElement.parentCoroutineId,
-                    scopeId = coroutineElement.scopeId,
-                    label = coroutineElement.label,
-                    reason = "delay",
-                    durationMillis = timeMillis,
-                    suspensionPoint = suspensionPoint
-                )
+                ctx.coroutineSuspended(reason = "delay", durationMillis = timeMillis, suspensionPoint = suspensionPoint)
             )
 
             // Actual suspension
@@ -447,6 +342,7 @@ class VizScope(
             delay(timeMillis)
         }
     }
+
 
     /**
      * Cancel all coroutines in this VizScope and wait for them to complete.
