@@ -16,34 +16,34 @@ object ScenarioRunner {
      */
     suspend fun runNestedCoroutines(session: VizSession): Job = coroutineScope {
         logger.info("Starting nested coroutines scenario in session: ${session.sessionId}")
-        
+
         val viz = VizScope(session)
-        
+
         val job = viz.vizLaunch("parent") {
             logger.debug("Parent coroutine started")
-            
+
             vizLaunch("child-1") {
                 logger.debug("Child-1 started")
-                
+
                 vizLaunch("child-1-1") {
                     logger.debug("Child-1-1 started")
                     vizDelay(5000)
                     logger.debug("Child-1-1 completed")
                 }
-                
+
                 vizDelay(2000)
                 logger.debug("Child-1 completed")
             }
-            
+
             vizLaunch("child-2") {
                 logger.debug("Child-2 started")
                 vizDelay(4000)
                 logger.debug("Child-2 completed")
             }
-            
+
             logger.debug("Parent completed")
         }
-        
+
         logger.info("Waiting for nested coroutines to complete...")
         job
     }
@@ -53,24 +53,24 @@ object ScenarioRunner {
      */
     suspend fun runParallelExecution(session: VizSession): Job = coroutineScope {
         logger.info("Starting parallel execution scenario in session: ${session.sessionId}")
-        
+
         val viz = VizScope(session)
-        
+
         val job = viz.vizLaunch("coordinator") {
             val jobs = List(5) { index ->
                 vizLaunch("worker-$index") {
-                    val workTime = (100..300).random()
+                    val workTime = (1000..5000).random()
                     logger.debug("Worker-$index starting (will work for ${workTime}ms)")
                     vizDelay(workTime.toLong())
                     logger.debug("Worker-$index completed")
                 }
             }
-            
+
             // Wait for all workers
             jobs.forEach { it.join() }
             logger.debug("All workers completed")
         }
-        
+
         logger.info("Waiting for parallel execution to complete...")
         job
     }
@@ -80,9 +80,9 @@ object ScenarioRunner {
      */
     suspend fun runCancellationScenario(session: VizSession): Job = coroutineScope {
         logger.info("Starting cancellation scenario in session: ${session.sessionId}")
-        
+
         val viz = VizScope(session)
-        
+
         val job = viz.vizLaunch("parent") {
             val child1 = vizLaunch("child-to-be-cancelled") {
                 logger.debug("Child starting long operation...")
@@ -94,24 +94,23 @@ object ScenarioRunner {
                     throw e
                 }
             }
-            
+
             val child2 = vizLaunch("normal-child") {
                 logger.debug("Normal child running")
-                vizDelay(100)
+                vizDelay(3000)
                 logger.debug("Normal child completed")
             }
-            
-            // Wait for normal child
-            child2.join()
-            
+
             // Cancel the long-running child
             logger.debug("Cancelling long-running child...")
-            child1.cancel()
-            
+//            child1.cancel()
+
             logger.debug("Parent completed")
         }
-        
+
         logger.info("Waiting for cancellation scenario to complete...")
+        delay(1000)
+        job.cancel()
         job
     }
 
@@ -120,9 +119,9 @@ object ScenarioRunner {
      */
     suspend fun runDeepNesting(session: VizSession, depth: Int = 5): Job = coroutineScope {
         logger.info("Starting deep nesting scenario (depth=$depth) in session: ${session.sessionId}")
-        
+
         val viz = VizScope(session)
-        
+
         suspend fun VizScope.createNested(level: Int): Job {
             return if (level >= depth) {
                 vizLaunch("leaf-$level") {
@@ -132,14 +131,15 @@ object ScenarioRunner {
             } else {
                 vizLaunch("level-$level") {
                     logger.debug("Level $level started")
-                    createNested(level + 1).join()
+                    createNested(level + 1)
+                    vizDelay(1000)
                     logger.debug("Level $level completed")
                 }
             }
         }
-        
+
         val job = viz.createNested(0)
-        
+
         logger.info("Waiting for deep nesting to complete...")
         job
     }
@@ -149,9 +149,9 @@ object ScenarioRunner {
      */
     suspend fun runMixedScenario(session: VizSession): Job = coroutineScope {
         logger.info("Starting mixed scenario in session: ${session.sessionId}")
-        
+
         val viz = VizScope(session)
-        
+
         val job = viz.vizLaunch("orchestrator") {
             // Phase 1: Sequential setup
             vizLaunch("setup-phase") {
@@ -159,7 +159,7 @@ object ScenarioRunner {
                 vizDelay(100)
                 logger.debug("Setup completed")
             }.join()
-            
+
             // Phase 2: Parallel work
             logger.debug("Starting parallel work phase...")
             val workers = List(3) { index ->
@@ -169,17 +169,17 @@ object ScenarioRunner {
                 }
             }
             workers.forEach { it.join() }
-            
+
             // Phase 3: Sequential cleanup
             vizLaunch("cleanup-phase") {
                 logger.debug("Cleanup starting...")
                 vizDelay(100)
                 logger.debug("Cleanup completed")
             }.join()
-            
+
             logger.debug("Orchestrator completed")
         }
-        
+
         logger.info("Waiting for mixed scenario to complete...")
         job
     }
@@ -223,12 +223,12 @@ object ScenarioRunner {
         if (config.description != null) {
             logger.info("Description: ${config.description}")
         }
-        
+
         val viz = VizScope(session)
-        
+
         // Execute the root coroutine configuration recursively
         val job = viz.executeCoroutineConfig(config.root)
-        
+
         logger.info("Custom scenario '${config.name}' launched, waiting for completion...")
         job
     }

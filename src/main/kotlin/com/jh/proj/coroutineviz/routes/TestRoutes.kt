@@ -45,6 +45,46 @@ fun Route.registerTestRoutes() {
             testDispatcherTracking()
         }
     }
+
+    // ========================================================================
+    // JOB STATUS TRACKING TESTS
+    // ========================================================================
+
+    get("/api/tests/waiting-for-children") {
+        call.runVizTest("Waiting for Children - Basic") {
+            testWaitingForChildren()
+        }
+    }
+
+    get("/api/tests/nested-waiting") {
+        call.runVizTest("Nested Waiting - Multi-level Hierarchy") {
+            testNestedWaitingForChildren()
+        }
+    }
+
+    get("/api/tests/mixed-waiting") {
+        call.runVizTest("Waiting with Mixed Launch + Async") {
+            testWaitingWithMixedChildren()
+        }
+    }
+
+    get("/api/tests/cancel-waiting") {
+        call.runVizTest("Cancellation During Waiting") {
+            testCancellationDuringWaiting()
+        }
+    }
+
+    get("/api/tests/progress-tracking") {
+        call.runVizTest("Progress Tracking - Children Over Time") {
+            testProgressTracking()
+        }
+    }
+
+    get("/api/tests/job-status-all") {
+        call.runVizTest("ALL JOB STATUS TESTS") {
+            runJobStatusTests()
+        }
+    }
 }
 
 private suspend fun ApplicationCall.runVizTest(

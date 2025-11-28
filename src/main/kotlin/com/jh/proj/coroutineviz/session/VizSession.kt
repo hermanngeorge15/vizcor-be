@@ -14,7 +14,10 @@ class VizSession(
     val bus = eventBus  // Alias for backwards compatibility
     val store = EventStore()
     val snapshot = RuntimeSnapshot()
+    val jobMonitor = JobStatusMonitor(session = this,100)
+
     private val applier = EventApplier(snapshot)
+    private var monitoringEnabled = false
 
     // Sequence generator to keep events globally ordered in this session
     private val seqGenerator = AtomicLong(0)
@@ -54,11 +57,19 @@ class VizSession(
         send(event)
     }
 
+    fun enableJobMonitoring() {
+        if (!monitoringEnabled) {
+            jobMonitor.start()
+            monitoringEnabled = true
+        }
+    }
+
     /**
      * Clean up session resources.
      * Call this when session is closed.
      */
     fun close() {
+        jobMonitor.stop()
         sessionScope.cancel()
     }
 }

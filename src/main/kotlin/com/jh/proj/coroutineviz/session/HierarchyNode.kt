@@ -18,5 +18,7 @@ data class HierarchyNode(
     val currentThreadName: String? = null,
     val jobId: String,
     val exceptionType: String? = null,       // If failed
-    val exceptionMessage: String? = null
+    val exceptionMessage: String? = null,
+    val activeChildrenIds: List<String> = emptyList(),
+    val activeChildrenCount: Int = 0
 )

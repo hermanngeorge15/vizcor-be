@@ -125,6 +125,32 @@ class ProjectionService(
                 }
             }
 
+            is WaitingForChildren -> {
+                coroutines[event.coroutineId]?.let { node ->
+                    coroutines[event.coroutineId] = node.copy(
+                        state = "WAITING_FOR_CHILDREN",
+                        activeChildrenIds = event.activeChildrenIds,      // ✨ NEW
+                        activeChildrenCount = event.activeChildrenCount   // ✨ NEW
+                    )
+                }
+            }
+
+            is JobStateChanged -> {
+                coroutines[event.coroutineId]?.let { node ->
+                    val newState = when {
+                        event.isCancelled -> "CANCELLED"
+                        event.isCompleted -> "COMPLETED"
+                        !event.isActive && event.childrenCount > 0 -> "WAITING_FOR_CHILDREN"
+                        event.isActive -> "ACTIVE"
+                        else -> node.state
+                    }
+
+                    coroutines[event.coroutineId] = node.copy(
+                        state = newState
+                    )
+                }
+            }
+
             // Ignore other event types (job operations, deferred, etc.)
             else -> { /* Ignore events we don't track in hierarchy */ }
         }
@@ -174,5 +200,26 @@ class ProjectionService(
             totalDuration = node.completedAtNanos?.let { it - node.createdAtNanos },
             // ... more computed fields ...
         )
+    }
+
+    /**
+     * Get all active children of a coroutine
+     */
+    fun getActiveChildren(coroutineId: String): List<HierarchyNode> {
+        val parent = coroutines[coroutineId] ?: return emptyList()
+        return parent.children.mapNotNull { childId ->
+            coroutines[childId]?.takeIf {
+                it.state in listOf("ACTIVE", "RUNNING", "SUSPENDED")
+            }
+        }
+    }
+
+    /**
+     * Check if coroutine is waiting for children
+     */
+    fun isWaitingForChildren(coroutineId: String): Boolean {
+        val node = coroutines[coroutineId] ?: return false
+        return node.state == "WAITING_FOR_CHILDREN" ||
+                (node.state == "BODY_COMPLETED" && getActiveChildren(coroutineId).isNotEmpty())
     }
 }
