@@ -637,6 +637,478 @@ class VizEventMain {
         logger.info("=".repeat(70))
     }
 
+    // ========================================================================
+    // JOB STATUS TRACKING TESTS - WaitingForChildren & Structured Concurrency
+    // ========================================================================
+
+    /**
+     * Test 7: Basic Waiting for Children
+     * Tests the WaitingForChildren event emission and job status tracking
+     */
+    suspend fun testWaitingForChildren() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("TEST 7: Waiting for Children - Job Status Tracking")
+        logger.info("Goal: Parent body completes but waits for 3 children")
+        logger.info("=".repeat(70))
+
+        val session = VizSession("test-waiting-for-children")
+        
+        // Enable job monitoring for real-time status updates
+        session.enableJobMonitoring()
+
+        // Track specific events we care about
+        val waitingEvents = mutableListOf<String>()
+        val jobStateEvents = mutableListOf<String>()
+        
+        val live = launch {
+            session.bus.stream().collect { event ->
+                when (event.kind) {
+                    "WaitingForChildren" -> {
+                        logger.info("⏳ WAITING EVENT | $event")
+                        waitingEvents.add(event.getLabel() ?: "unknown")
+                    }
+                    "JobStateChanged" -> {
+                        logger.info("📊 JOB STATE | $event")
+                        jobStateEvents.add(event.getLabel() ?: "unknown")
+                    }
+                    "CoroutineBodyCompleted" -> {
+                        logger.info("🏁 BODY DONE | ${event.getLabel()}")
+                    }
+                    "CoroutineCompleted" -> {
+                        logger.info("✅ COMPLETED | ${event.getLabel()}")
+                    }
+                }
+            }
+        }
+
+        val viz = VizScope(session)
+
+      val job =  viz.vizLaunch("parent") {
+            logger.info("👨‍👧‍👦 Parent: Launching 3 children with different durations...")
+            
+            vizLaunch("child-1-fast") {
+                logger.info("🏃 Child-1: Running fast task (500ms)...")
+                vizDelay(500)
+                logger.info("✅ Child-1: Done!")
+            }
+            
+            vizLaunch("child-2-medium") {
+                logger.info("🚶 Child-2: Running medium task (1000ms)...")
+                vizDelay(1000)
+                logger.info("✅ Child-2: Done!")
+            }
+            
+            vizLaunch("child-3-slow") {
+                logger.info("🐌 Child-3: Running slow task (1500ms)...")
+                vizDelay(5000)
+                logger.info("✅ Child-3: Done!")
+            }
+            
+            logger.info("👨‍👧‍👦 Parent: Body finished! Now waiting for children...")
+            // Parent body ends here, but won't complete until all children finish
+        }
+
+        // Wait for everything to complete
+        delay(2000)
+
+        logger.info("\n" + "=".repeat(70))
+        logger.info("VERIFICATION:")
+        logger.info("  WaitingForChildren events: ${waitingEvents.size} (expected: 1)")
+        logger.info("  Parent should have emitted WaitingForChildren: ${waitingEvents.contains("parent")}")
+        
+        logger.info("\n🔍 FINAL STATES:")
+        session.snapshot.coroutines.values.forEach { node ->
+            logger.info("  ${node.label ?: node.id}: ${node.state}")
+        }
+
+        logger.info("\n📊 HIERARCHY:")
+        session.projectionService.getHierarchyTree().forEach { node ->
+            logger.info("  ${node.name} [${node.state}] - children: ${node.children.size}, active: ${node.activeChildrenCount}")
+        }
+
+        val success = waitingEvents.contains("parent")
+        if (success) {
+            logger.info("\n✅ SUCCESS: WaitingForChildren event properly emitted!")
+        } else {
+            logger.error("\n❌ FAILURE: WaitingForChildren event NOT emitted!")
+        }
+
+        live.cancel()
+        session.close()
+        job.cancel()
+        logger.info("✅ TEST 7 COMPLETED\n")
+    }
+
+    /**
+     * Test 8: Nested Waiting for Children
+     * Tests hierarchical waiting - parent waits for children who also wait for their children
+     */
+    suspend fun testNestedWaitingForChildren() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("TEST 8: Nested Waiting - Multi-level Hierarchy")
+        logger.info("Goal: L1 waits for L2, L2 waits for L3")
+        logger.info("=".repeat(70))
+
+        val session = VizSession("test-nested-waiting")
+        session.enableJobMonitoring()
+
+        val waitingCoroutines = mutableSetOf<String>()
+        
+        val live = launch {
+            session.bus.stream().collect { event ->
+                when (event.kind) {
+                    "WaitingForChildren" -> {
+                        val label = event.getLabel() ?: "unknown"
+                        waitingCoroutines.add(label)
+                        logger.info("⏳ $label is WAITING for children")
+                    }
+                    "CoroutineCompleted" -> {
+                        logger.info("✅ ${event.getLabel()} COMPLETED")
+                    }
+                }
+            }
+        }
+
+        val viz = VizScope(session)
+
+        viz.vizLaunch("level-1") {
+            logger.info("🏢 L1: Starting...")
+            
+            vizLaunch("level-2-A") {
+                logger.info("  🏬 L2-A: Starting...")
+                
+                vizLaunch("level-3-A1") {
+                    logger.info("    🏪 L3-A1: Working for 800ms...")
+                    vizDelay(800)
+                    logger.info("    ✅ L3-A1: Done")
+                }
+                
+                vizLaunch("level-3-A2") {
+                    logger.info("    🏪 L3-A2: Working for 1200ms...")
+                    vizDelay(1200)
+                    logger.info("    ✅ L3-A2: Done")
+                }
+                
+                logger.info("  🏬 L2-A: Body done, waiting for grandchildren...")
+            }
+            
+            vizLaunch("level-2-B") {
+                logger.info("  🏬 L2-B: Starting...")
+                
+                vizLaunch("level-3-B1") {
+                    logger.info("    🏪 L3-B1: Working for 600ms...")
+                    vizDelay(600)
+                    logger.info("    ✅ L3-B1: Done")
+                }
+                
+                logger.info("  🏬 L2-B: Body done, waiting for grandchild...")
+            }
+            
+            logger.info("🏢 L1: Body done, waiting for all descendants...")
+        }
+
+        delay(1500)
+
+        logger.info("\n" + "=".repeat(70))
+        logger.info("VERIFICATION:")
+        logger.info("  Coroutines that waited: $waitingCoroutines")
+        logger.info("  Expected: level-1, level-2-A, level-2-B")
+        
+        val expectedWaiters = setOf("level-1", "level-2-A", "level-2-B")
+        val allWaited = expectedWaiters.all { waitingCoroutines.contains(it) }
+        
+        if (allWaited) {
+            logger.info("\n✅ SUCCESS: All levels properly waited for children!")
+        } else {
+            logger.error("\n❌ FAILURE: Some levels did not wait. Missing: ${expectedWaiters - waitingCoroutines}")
+        }
+
+        live.cancel()
+        session.close()
+        logger.info("✅ TEST 8 COMPLETED\n")
+    }
+
+    /**
+     * Test 9: Waiting with Mixed Async and Launch
+     * Tests waiting when parent has both launch and async children
+     */
+    suspend fun testWaitingWithMixedChildren() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("TEST 9: Waiting with Mixed Launch + Async")
+        logger.info("Goal: Parent waits for both launch and async children")
+        logger.info("=".repeat(70))
+
+        val session = VizSession("test-mixed-waiting")
+        session.enableJobMonitoring()
+
+        val live = launch {
+            session.bus.stream().collect { event ->
+                when (event.kind) {
+                    "WaitingForChildren" -> {
+                        logger.info("⏳ ${event.getLabel()} waiting | $event")
+                    }
+                    "DeferredValueAvailable" -> {
+                        logger.info("📦 Async result ready | $event")
+                    }
+                }
+            }
+        }
+
+        val viz = VizScope(session)
+
+        viz.vizLaunch("parent") {
+            logger.info("👨‍👧‍👦 Parent: Starting mixed children...")
+            
+            // Regular launch
+            vizLaunch("launch-child") {
+                logger.info("🚀 Launch child: Working...")
+                vizDelay(800)
+                logger.info("✅ Launch child: Done")
+            }
+            
+            // Async children (not awaited in parent body)
+            val async1 = vizAsync("async-child-1") {
+                logger.info("⚙️ Async-1: Computing...")
+                vizDelay(1000)
+                logger.info("✅ Async-1: Done")
+                "Result-1"
+            }
+            
+            val async2 = vizAsync("async-child-2") {
+                logger.info("⚙️ Async-2: Computing...")
+                vizDelay(1200)
+                logger.info("✅ Async-2: Done")
+                "Result-2"
+            }
+            
+            logger.info("👨‍👧‍👦 Parent: Body finished, waiting for all children...")
+            // Parent waits for BOTH launch and async children even without await!
+        }
+
+        delay(1500)
+
+        logger.info("\n" + "=".repeat(70))
+        logger.info("VERIFICATION:")
+        logger.info("  All children should have completed")
+        
+        session.snapshot.coroutines.values
+            .filter { it.label?.contains("child") == true }
+            .forEach { 
+                logger.info("  ${it.label}: ${it.state}")
+            }
+
+        live.cancel()
+        session.close()
+        logger.info("✅ TEST 9 COMPLETED\n")
+    }
+
+    /**
+     * Test 10: Cancellation During Waiting
+     * Tests what happens when parent is cancelled while waiting for children
+     */
+    suspend fun testCancellationDuringWaiting() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("TEST 10: Cancellation During Waiting")
+        logger.info("Goal: Parent cancelled while waiting → children also cancelled")
+        logger.info("=".repeat(70))
+
+        val session = VizSession("test-cancel-waiting")
+        session.enableJobMonitoring()
+
+        val live = launch {
+            session.bus.stream().collect { event ->
+                when (event.kind) {
+                    "WaitingForChildren" -> {
+                        logger.info("⏳ ${event.getLabel()} waiting")
+                    }
+                    "CoroutineCancelled" -> {
+                        logger.info("🚫 ${event.getLabel()} CANCELLED")
+                    }
+                }
+            }
+        }
+
+        val viz = VizScope(session)
+
+        val parentJob = viz.vizLaunch("parent") {
+            logger.info("👨‍👧‍👦 Parent: Launching long-running children...")
+            
+            vizLaunch("child-1") {
+                logger.info("🌱 Child-1: Starting long task...")
+                try {
+                    vizDelay(5000)  // Very long
+                    logger.error("❌ Child-1: Should not complete!")
+                } catch (e: Exception) {
+                    logger.info("🚫 Child-1: Cancelled as expected")
+                    throw e
+                }
+            }
+            
+            vizLaunch("child-2") {
+                logger.info("🌱 Child-2: Starting long task...")
+                try {
+                    vizDelay(5000)  // Very long
+                    logger.error("❌ Child-2: Should not complete!")
+                } catch (e: Exception) {
+                    logger.info("🚫 Child-2: Cancelled as expected")
+                    throw e
+                }
+            }
+            
+            logger.info("👨‍👧‍👦 Parent: Body done, waiting...")
+        }
+
+        // Let parent enter waiting state
+        delay(200)
+        
+        logger.info("\n💥 CANCELLING PARENT NOW!")
+        parentJob.cancel()
+        
+        delay(500)
+
+        logger.info("\n" + "=".repeat(70))
+        logger.info("VERIFICATION - All should be CANCELLED:")
+        session.snapshot.coroutines.values.forEach { node ->
+            val emoji = if (node.state == CoroutineState.CANCELLED) "✅" else "❌"
+            logger.info("  $emoji ${node.label}: ${node.state}")
+        }
+
+        val allCancelled = session.snapshot.coroutines.values.all { 
+            it.state == CoroutineState.CANCELLED 
+        }
+
+        if (allCancelled) {
+            logger.info("\n✅ SUCCESS: Cancellation properly propagated!")
+        } else {
+            logger.error("\n❌ FAILURE: Some coroutines not cancelled!")
+        }
+
+        live.cancel()
+        session.close()
+        logger.info("✅ TEST 10 COMPLETED\n")
+    }
+
+    /**
+     * Test 11: Progress Tracking
+     * Tests that we can track children completion progress over time
+     */
+    suspend fun testProgressTracking() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("TEST 11: Progress Tracking - Children Complete Over Time")
+        logger.info("Goal: Monitor parent's active children count decreasing")
+        logger.info("=".repeat(70))
+
+        val session = VizSession("test-progress-tracking")
+        session.enableJobMonitoring()
+
+        val progressUpdates = mutableListOf<Pair<Long, Int>>()  // (timestamp, activeCount)
+        
+        val live = launch {
+            session.bus.stream().collect { event ->
+                when (event.kind) {
+                    "WaitingForChildren" -> {
+                        val evt = event as com.jh.proj.coroutineviz.events.WaitingForChildren
+                        val timestamp = System.currentTimeMillis()
+                        progressUpdates.add(timestamp to evt.activeChildrenCount)
+                        logger.info("📊 PROGRESS: ${evt.activeChildrenCount} children still active at ${timestamp}")
+                    }
+                    "JobStateChanged" -> {
+                        val evt = event as com.jh.proj.coroutineviz.events.JobStateChanged
+                        if (evt.label == "parent") {
+                            logger.info("📊 JOB STATE: parent has ${evt.childrenCount} children")
+                        }
+                    }
+                }
+            }
+        }
+
+        val viz = VizScope(session)
+
+        viz.vizLaunch("parent") {
+            logger.info("👨‍👧‍👦 Parent: Launching staggered children...")
+            
+            vizLaunch("child-1") {
+                logger.info("🏃 Child-1: 300ms")
+                vizDelay(300)
+                logger.info("✅ Child-1: Done")
+            }
+            
+            vizLaunch("child-2") {
+                logger.info("🏃 Child-2: 600ms")
+                vizDelay(600)
+                logger.info("✅ Child-2: Done")
+            }
+            
+            vizLaunch("child-3") {
+                logger.info("🏃 Child-3: 900ms")
+                vizDelay(900)
+                logger.info("✅ Child-3: Done")
+            }
+            
+            vizLaunch("child-4") {
+                logger.info("🏃 Child-4: 1200ms")
+                vizDelay(1200)
+                logger.info("✅ Child-4: Done")
+            }
+            
+            logger.info("👨‍👧‍👦 Parent: Waiting for 4 children...")
+        }
+
+        delay(1500)
+
+        logger.info("\n" + "=".repeat(70))
+        logger.info("PROGRESS UPDATES:")
+        progressUpdates.forEach { (time, count) ->
+            logger.info("  Time: $time, Active children: $count")
+        }
+
+        logger.info("\n📊 Expected progression: 4 → 3 → 2 → 1 → 0")
+        logger.info("   Actual updates: ${progressUpdates.size}")
+
+        live.cancel()
+        session.close()
+        logger.info("✅ TEST 11 COMPLETED\n")
+    }
+
+    /**
+     * Master test runner for Job Status tests
+     */
+    suspend fun runJobStatusTests() = coroutineScope {
+        logger.info("\n" + "#".repeat(80))
+        logger.info("# JOB STATUS TRACKING TEST SUITE")
+        logger.info("# Testing: WaitingForChildren, JobStateChanged, Progress Tracking")
+        logger.info("#".repeat(80) + "\n")
+
+        try {
+            // Test 7: Basic waiting
+            testWaitingForChildren()
+            delay(500)
+
+            // Test 8: Nested waiting
+            testNestedWaitingForChildren()
+            delay(500)
+
+            // Test 9: Mixed async + launch
+            testWaitingWithMixedChildren()
+            delay(500)
+
+            // Test 10: Cancellation during waiting
+            testCancellationDuringWaiting()
+            delay(500)
+
+            // Test 11: Progress tracking
+            testProgressTracking()
+            delay(500)
+
+            logger.info("\n" + "#".repeat(80))
+            logger.info("# ALL JOB STATUS TESTS COMPLETED!")
+            logger.info("#".repeat(80))
+
+        } catch (e: Exception) {
+            logger.error("Job status test suite failed!", e)
+        }
+    }
+
     companion object {
         val logger = LoggerFactory.getLogger(VizEventMain::class.java)
     }

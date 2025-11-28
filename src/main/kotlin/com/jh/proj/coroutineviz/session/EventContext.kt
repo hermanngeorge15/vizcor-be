@@ -231,3 +231,18 @@ fun EventContext.threadAssigned(
     dispatcherName = dispatcherName
 )
 
+fun EventContext.waitingForChildren(
+    activeChildrenCount: Int,
+    activeChildrenIds: List<String>
+): WaitingForChildren = WaitingForChildren(
+    sessionId = sessionId,
+    seq = nextSeq(),
+    tsNanos = timestamp(),
+    coroutineId = coroutineId,
+    jobId = jobId,
+    parentCoroutineId = parentCoroutineId,
+    scopeId = scopeId,
+    label = label,
+    activeChildrenCount = activeChildrenCount,
+    activeChildrenIds = activeChildrenIds
+)
