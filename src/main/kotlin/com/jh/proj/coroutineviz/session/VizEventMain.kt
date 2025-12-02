@@ -1,13 +1,17 @@
 package com.jh.proj.coroutineviz.session
 
-import com.jh.proj.coroutineviz.extension.getLabel
+import com.jh.proj.coroutineviz.events.CoroutineEvent
+import com.jh.proj.coroutineviz.events.JobStateChanged
+import com.jh.proj.coroutineviz.extension.*
 import com.jh.proj.coroutineviz.wrappers.VizDispatchers
 import com.jh.proj.coroutineviz.wrappers.VizScope
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import kotlin.math.abs
 
 class VizEventMain {
 
@@ -1107,6 +1111,455 @@ class VizEventMain {
         } catch (e: Exception) {
             logger.error("Job status test suite failed!", e)
         }
+    }
+
+    // Corrected debug function
+    suspend fun debugCoroutineTimeline(session: VizSession, coroutineId: String) {
+        println("=== SPLIT TIMELINE DEBUG ===")
+
+        val timeline = session.getSplitTimeline(coroutineId, newestFirst = true)
+
+        println("\n--- COROUTINE LIFECYCLE EVENTS (${timeline.coroutineEvents.size}) ---")
+        timeline.coroutineEvents.forEachIndexed { index, event ->
+            val relativeTime = if (timeline.coroutineEvents.isNotEmpty()) {
+                (event.tsNanos - timeline.coroutineEvents.last().tsNanos) / 1_000_000.0
+            } else 0.0
+            println("$index. [+${relativeTime}ms] ${event.kind} - ${event.label ?: event.coroutineId}")
+        }
+
+        println("\n--- JOB STATE CHANGES (${timeline.jobEvents.size}) ---")
+        timeline.jobEvents.forEachIndexed { index, event ->
+            val relativeTime = if (timeline.jobEvents.isNotEmpty()) {
+                (event.tsNanos - timeline.jobEvents.last().tsNanos) / 1_000_000.0
+            } else 0.0
+            // CORRECTED: Use actual fields
+            println("$index. [+${relativeTime}ms] ${event.deriveState()} - active=${event.isActive}, completed=${event.isCompleted}, cancelled=${event.isCancelled}, children=${event.childrenCount}")
+        }
+
+        println("\n--- MERGED TIMELINE (${timeline.merged.size}) ---")
+        timeline.merged.forEachIndexed { index, event ->
+            val relativeTime = if (timeline.merged.isNotEmpty()) {
+                (event.tsNanos - timeline.merged.last().tsNanos) / 1_000_000.0
+            } else 0.0
+
+            val details = when (event) {
+                is CoroutineEvent -> event.kind
+                is JobStateChanged -> event.formatStateInfo()
+                else -> event.kind
+            }
+
+            val marker = when (event) {
+                is CoroutineEvent -> "🔵 COROUTINE"
+                is JobStateChanged -> "🟢 JOB STATE"
+                else -> "⚪ OTHER"
+            }
+
+            println("$index. [+${relativeTime}ms] $marker: $details")
+        }
+    }
+
+    // Corrected flow debugging
+    fun debugWithFlows(session: VizSession) = runBlocking {
+        println("=== REAL-TIME FLOW DEBUGGING ===")
+
+        launch {
+            println("\n--- Collecting Coroutine Events ---")
+            session.coroutineLifecycleFlow()
+                .collect { event ->
+                    println("🔵 ${event.kind} | ${event.label ?: event.coroutineId.take(8)} | seq:${event.seq}")
+                }
+        }
+
+        launch {
+            println("\n--- Collecting Job State Events ---")
+            session.jobStateFlow()
+                .collect { event ->
+                    // CORRECTED: Use actual fields
+                    println("🟢 ${event.deriveState()} | active=${event.isActive} completed=${event.isCompleted} cancelled=${event.isCancelled} | children=${event.childrenCount} | job:${event.jobId.take(8)}")
+                }
+        }
+    }
+
+    // Corrected comparison function
+    fun VizSession.compareJobStateProgression(coroutineId: String) {
+        val timeline = getSplitTimeline(coroutineId, newestFirst = false)  // Oldest first
+
+        println("\n🟢 JOB STATE PROGRESSION:")
+        var previousState: String? = null
+        timeline.jobEvents.forEach { event ->
+            val currentState = event.deriveState()
+            val transition = if (previousState != null) {
+                "$previousState → $currentState"
+            } else {
+                "START → $currentState"
+            }
+            println("   $transition (children: ${event.childrenCount})")
+            previousState = currentState
+        }
+
+        println("\n🔵 COROUTINE LIFECYCLE:")
+        timeline.coroutineEvents.forEach { event ->
+            println("   ${event.kind}")
+        }
+
+        println("\n🔗 INTERLEAVED:")
+        timeline.merged.forEach { event ->
+            when (event) {
+                is CoroutineEvent -> {
+                    println("   🔵 ${event.kind}")
+                }
+                is JobStateChanged -> {
+                    println("   🟢 ${event.deriveState()} (active=${event.isActive}, completed=${event.isCompleted}, cancelled=${event.isCancelled}, children=${event.childrenCount})")
+                }
+
+                else -> {
+                    println("empty branch")
+                }
+            }
+        }
+    }
+
+    // Enhanced print function
+    fun VizSession.printCoroutineTimeline(coroutineId: String) {
+        val timeline = getSplitTimeline(coroutineId, newestFirst = true)
+
+        println("\n${"=".repeat(80)}")
+        println("TIMELINE FOR COROUTINE: $coroutineId")
+        println("=".repeat(80))
+
+        val startTime = timeline.merged.lastOrNull()?.tsNanos ?: 0L
+
+        timeline.merged.forEach { event ->
+            val elapsed = (event.tsNanos - startTime) / 1_000_000.0
+            val icon = when (event) {
+                is CoroutineEvent -> "🔵"
+                is JobStateChanged -> "🟢"
+                else -> "⚪"
+            }
+
+            val details = when (event) {
+                is CoroutineEvent -> {
+                    event.label ?: event.coroutineId.take(8)
+                }
+                is JobStateChanged -> {
+                    // CORRECTED: Show actual state flags
+                    "${event.deriveState()} [A:${event.isActive} C:${event.isCompleted} X:${event.isCancelled} ch:${event.childrenCount}]"
+                }
+                else -> ""
+            }
+
+            println(String.format("%s [%8.2fms] %-30s %s",
+                icon, elapsed, event.kind, details))
+        }
+        println("=".repeat(80))
+    }
+
+    // ========================================================================
+    // PRACTICAL USAGE EXAMPLES - How to use the debug functions
+    // ========================================================================
+
+    /**
+     * Example 1: Simple usage of printCoroutineTimeline
+     */
+    suspend fun exampleUsage1_PrintTimeline() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use printCoroutineTimeline()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-1")
+        val scope = VizScope(session)
+        
+        // Run a scenario
+        scope.vizLaunch("my-coroutine") {
+            vizDelay(200)
+            vizLaunch("child") {
+                vizDelay(100)
+            }
+        }
+        
+        delay(400)
+        
+        // Get the coroutine ID
+        val coroutine = session.snapshot.coroutines.values
+            .find { it.label == "my-coroutine" }
+        
+        if (coroutine != null) {
+            // USAGE: Just call printCoroutineTimeline!
+            session.printCoroutineTimeline(coroutine.id)
+        }
+        
+        session.close()
+    }
+
+    /**
+     * Example 2: Using getSplitTimeline to analyze separately
+     */
+    suspend fun exampleUsage2_SplitAnalysis() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use getSplitTimeline()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-2")
+        val scope = VizScope(session)
+        
+        scope.vizLaunch("test") {
+            vizDelay(300)
+        }
+        
+        delay(400)
+        
+        val coroutine = session.snapshot.coroutines.values.first()
+        
+        // USAGE: Get split timeline
+        val timeline = session.getSplitTimeline(coroutine.id, newestFirst = false)
+        
+        logger.info("Coroutine events: ${timeline.coroutineEvents.size}")
+        logger.info("Job events: ${timeline.jobEvents.size}")
+        
+        // You can iterate each list separately
+        timeline.coroutineEvents.forEach { event ->
+            logger.info("  Coroutine: ${event.kind}")
+        }
+        
+        timeline.jobEvents.forEach { event ->
+            logger.info("  Job: ${event.deriveState()}")
+        }
+        
+        session.close()
+    }
+
+    /**
+     * Example 3: Using flows for real-time monitoring
+     */
+    suspend fun exampleUsage3_RealTimeFlows() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use coroutineLifecycleFlow() and jobStateFlow()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-3")
+        val scope = VizScope(session)
+        
+        // USAGE: Start collecting flows BEFORE running coroutines
+        val coroutineCollector = launch {
+            session.coroutineLifecycleFlow()
+                .collect { event ->
+                    logger.info("🔵 Coroutine event: ${event.kind} - ${event.label}")
+                }
+        }
+        
+        val jobCollector = launch {
+            session.jobStateFlow()
+                .collect { event ->
+                    logger.info("🟢 Job state: ${event.deriveState()}")
+                }
+        }
+        
+        delay(100)  // Let collectors start
+        
+        // Now run your scenario
+        scope.vizLaunch("monitored") {
+            vizDelay(200)
+        }
+        
+        delay(300)
+        
+        // Stop collecting
+        coroutineCollector.cancel()
+        jobCollector.cancel()
+        
+        session.close()
+    }
+
+    /**
+     * Example 4: Using compareJobStateProgression
+     */
+    suspend fun exampleUsage4_CompareProgression() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use compareJobStateProgression()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-4")
+        val scope = VizScope(session)
+        
+        scope.vizLaunch("parent") {
+            vizLaunch("child-1") { vizDelay(100) }
+            vizLaunch("child-2") { vizDelay(200) }
+        }
+        
+        delay(300)
+        
+        val coroutine = session.snapshot.coroutines.values
+            .find { it.label == "parent" }
+        
+        if (coroutine != null) {
+            // USAGE: See side-by-side comparison
+            session.compareJobStateProgression(coroutine.id)
+        }
+        
+        session.close()
+    }
+
+    /**
+     * Example 5: Using printSessionSummary
+     */
+    suspend fun exampleUsage5_SessionSummary() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use printSessionSummary()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-5")
+        val scope = VizScope(session)
+        
+        // Create multiple coroutines
+        scope.vizLaunch("coroutine-A") { vizDelay(100) }
+        scope.vizLaunch("coroutine-B") { vizDelay(100) }
+        scope.vizLaunch("coroutine-C") { vizDelay(100) }
+        
+        delay(150)
+        
+        // USAGE: Print overview of all coroutines
+        session.printSessionSummary()
+        
+        session.close()
+    }
+
+    /**
+     * Example 6: Debugging a specific coroutine by finding it first
+     */
+    suspend fun exampleUsage6_DebugSpecific() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: Debug specific coroutine by label")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-6")
+        val scope = VizScope(session)
+        
+        // Run multiple coroutines
+        scope.vizLaunch("target") {
+            vizDelay(100)
+            vizLaunch("nested") {
+                vizDelay(50)
+            }
+        }
+        
+        scope.vizLaunch("other") {
+            vizDelay(100)
+        }
+        
+        delay(200)
+        
+        // USAGE: Find coroutine by label, then debug it
+        val target = session.snapshot.coroutines.values
+            .find { it.label == "target" }
+        
+        if (target != null) {
+            logger.info("Found target: ${target.id}")
+            
+            // Print its timeline
+            session.printCoroutineTimeline(target.id)
+            
+            // Analyze its job state transitions
+            session.analyzeJobStateTransitions(target.id)
+            
+            // Compare progression
+            session.compareJobStateProgression(target.id)
+        }
+        
+        session.close()
+    }
+
+    /**
+     * Example 7: Using merged flow to see everything together
+     */
+    suspend fun exampleUsage7_MergedFlow() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: How to use mergedTimelineFlow()")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-7")
+        val scope = VizScope(session)
+        
+        // USAGE: Collect merged flow (coroutine + job events together)
+        val collector = launch {
+            session.mergedTimelineFlow()
+                .collect { event ->
+                    val type = when (event) {
+                        is CoroutineEvent -> "COROUTINE"
+                        is JobStateChanged -> "JOB"
+                        else -> "OTHER"
+                    }
+                    logger.info("[$type] ${event.kind}")
+                }
+        }
+        
+        delay(50)
+        
+        scope.vizLaunch("test") {
+            vizDelay(100)
+        }
+        
+        delay(200)
+        
+        collector.cancel()
+        session.close()
+    }
+
+    /**
+     * Example 8: Complete debugging workflow
+     */
+    suspend fun exampleUsage8_CompleteWorkflow() = coroutineScope {
+        logger.info("\n" + "=".repeat(70))
+        logger.info("EXAMPLE: Complete debugging workflow")
+        logger.info("=".repeat(70))
+        
+        val session = VizSession("example-8")
+        val scope = VizScope(session)
+        
+        // Step 1: Start monitoring flows
+        val flowCollector = launch {
+            session.mergedTimelineFlow().collect { event ->
+                when (event) {
+                    is CoroutineEvent -> logger.info("🔵 ${event.kind} - ${event.label}")
+                    is JobStateChanged -> logger.info("🟢 ${event.deriveState()}")
+                    else -> {logger.warn("do not need it")}
+                }
+            }
+        }
+        
+        delay(50)
+        
+        // Step 2: Run your scenario
+        logger.info("\n🚀 Running scenario...")
+        scope.vizLaunch("parent") {
+            vizLaunch("child-1") {
+                vizDelay(150)
+            }
+            vizLaunch("child-2") {
+                vizDelay(300)
+            }
+        }
+        
+        delay(400)
+        
+        // Step 3: Stop flow collection
+        flowCollector.cancel()
+        
+        // Step 4: Print session summary
+        logger.info("\n📊 Session Summary:")
+        session.printSessionSummary()
+        
+        // Step 5: Analyze specific coroutine
+        val parent = session.snapshot.coroutines.values
+            .find { it.label == "parent" }
+        
+        if (parent != null) {
+            logger.info("\n🔍 Detailed analysis of 'parent':")
+            session.printCoroutineTimeline(parent.id)
+            session.compareJobStateProgression(parent.id)
+            session.analyzeJobStateTransitions(parent.id)
+        }
+        
+        session.close()
     }
 
     companion object {
