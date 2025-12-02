@@ -12,3 +12,5 @@ GET http://localhost:8080/api/tests/async-basic
 ###
 GET http://localhost:8080/api/tests/exception-propagation
 
+###
+GET http://localhost:8080/api/tests/waiting-for-children
