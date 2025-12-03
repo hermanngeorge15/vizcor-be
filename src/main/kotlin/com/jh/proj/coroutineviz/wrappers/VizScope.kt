@@ -1,6 +1,7 @@
 package com.jh.proj.coroutineviz.wrappers
 
 import com.jh.proj.coroutineviz.events.DeferredValueAvailable
+import com.jh.proj.coroutineviz.events.FlowCreated
 import com.jh.proj.coroutineviz.events.InstrumentedDeferred
 import com.jh.proj.coroutineviz.events.SuspensionPoint
 import com.jh.proj.coroutineviz.events.ThreadAssigned
@@ -20,8 +21,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
@@ -356,5 +363,311 @@ class VizScope(
      */
     fun cancel() {
         coroutineContext[Job]?.cancel()
+    }
+
+    // ========================================================================
+    // Flow Builders
+    // ========================================================================
+
+    /**
+     * Create an instrumented Flow with visualization tracking.
+     * 
+     * This function wraps a flow builder to emit events for:
+     * - Flow creation
+     * - Collection start/complete/cancel
+     * - Value emissions with sequence numbers
+     * - Operator applications
+     * 
+     * Usage:
+     * ```kotlin
+     * val flow = scope.vizFlow("my-flow") {
+     *     emit(1)
+     *     emit(2)
+     *     emit(3)
+     * }
+     * 
+     * flow.collect { println(it) }
+     * ```
+     * 
+     * @param label Optional human-readable label for the flow
+     * @param block The flow builder block
+     * @return An InstrumentedFlow that tracks all operations
+     */
+    fun <T> vizFlow(
+        label: String? = null,
+        block: suspend FlowCollector<T>.() -> Unit
+    ): InstrumentedFlow<T> {
+        val flowId = "flow-${session.nextSeq()}"
+        val coroutineId = runCatching { 
+            kotlinx.coroutines.runBlocking { 
+                currentCoroutineContext()[VizCoroutineElement]?.coroutineId 
+            } 
+        }.getOrNull()
+        
+        // Emit FlowCreated event
+        session.send(
+            FlowCreated(
+                sessionId = session.sessionId,
+                seq = session.nextSeq(),
+                tsNanos = System.nanoTime(),
+                coroutineId = coroutineId ?: "unknown",
+                flowId = flowId,
+                flowType = "Cold",
+                label = label,
+                scopeId = scopeId
+            )
+        )
+        
+        // Create the underlying flow
+        val underlyingFlow = flow(block)
+        
+        // Wrap it with instrumentation
+        return InstrumentedFlow(
+            delegate = underlyingFlow,
+            session = session,
+            flowId = flowId,
+            flowType = "Cold",
+            label = label
+        )
+    }
+
+    /**
+     * Wrap an existing Flow with instrumentation.
+     * 
+     * Use this to add visualization tracking to any existing Flow.
+     * 
+     * @param existingFlow The Flow to wrap
+     * @param label Optional human-readable label
+     * @return An InstrumentedFlow that tracks all operations
+     */
+    fun <T> vizWrap(
+        existingFlow: Flow<T>,
+        label: String? = null
+    ): InstrumentedFlow<T> {
+        val flowId = "flow-${session.nextSeq()}"
+        val coroutineId = runCatching { 
+            kotlinx.coroutines.runBlocking { 
+                currentCoroutineContext()[VizCoroutineElement]?.coroutineId 
+            } 
+        }.getOrNull()
+        
+        // Emit FlowCreated event
+        session.send(
+            FlowCreated(
+                sessionId = session.sessionId,
+                seq = session.nextSeq(),
+                tsNanos = System.nanoTime(),
+                coroutineId = coroutineId ?: "unknown",
+                flowId = flowId,
+                flowType = "Cold",
+                label = label,
+                scopeId = scopeId
+            )
+        )
+        
+        return InstrumentedFlow(
+            delegate = existingFlow,
+            session = session,
+            flowId = flowId,
+            flowType = "Cold",
+            label = label
+        )
+    }
+
+    /**
+     * Create an instrumented MutableStateFlow.
+     * 
+     * StateFlow is a hot Flow that:
+     * - Always has a current value
+     * - Replays the current value to new collectors
+     * - Emits only when value changes (distinctUntilChanged)
+     * 
+     * @param initialValue The initial value of the StateFlow
+     * @param label Optional human-readable label
+     * @return An InstrumentedStateFlow with visualization tracking
+     */
+    fun <T> vizStateFlow(
+        initialValue: T,
+        label: String? = null
+    ): InstrumentedStateFlow<T> {
+        val flowId = "stateflow-${session.nextSeq()}"
+        return InstrumentedStateFlow(
+            delegate = MutableStateFlow(initialValue),
+            session = session,
+            flowId = flowId,
+            label = label
+        )
+    }
+
+    /**
+     * Create an instrumented MutableSharedFlow.
+     * 
+     * SharedFlow is a hot Flow that:
+     * - Can have multiple subscribers
+     * - Supports replay cache for late subscribers
+     * - Can buffer emissions with configurable overflow strategy
+     * 
+     * @param replay Number of values to replay to new subscribers
+     * @param extraBufferCapacity Extra buffer capacity beyond replay
+     * @param onBufferOverflow Strategy for handling buffer overflow
+     * @param label Optional human-readable label
+     * @return An InstrumentedSharedFlow with visualization tracking
+     */
+    fun <T> vizSharedFlow(
+        replay: Int = 0,
+        extraBufferCapacity: Int = 0,
+        onBufferOverflow: BufferOverflow = BufferOverflow.SUSPEND,
+        label: String? = null
+    ): InstrumentedSharedFlow<T> {
+        val flowId = "sharedflow-${session.nextSeq()}"
+        return InstrumentedSharedFlow(
+            delegate = MutableSharedFlow(replay, extraBufferCapacity, onBufferOverflow),
+            session = session,
+            flowId = flowId,
+            label = label,
+            extraBufferCapacity = extraBufferCapacity
+        )
+    }
+
+    /**
+     * Create an instrumented interval Flow that emits values at fixed intervals.
+     * 
+     * Useful for testing timing-related Flow behavior.
+     * 
+     * @param periodMillis The interval between emissions in milliseconds
+     * @param initialDelayMillis Optional initial delay before first emission
+     * @param label Optional human-readable label
+     * @return An InstrumentedFlow that emits Long values at intervals
+     */
+    fun vizInterval(
+        periodMillis: Long,
+        initialDelayMillis: Long = 0,
+        label: String? = null
+    ): InstrumentedFlow<Long> {
+        val flowId = "flow-interval-${session.nextSeq()}"
+        
+        session.send(
+            FlowCreated(
+                sessionId = session.sessionId,
+                seq = session.nextSeq(),
+                tsNanos = System.nanoTime(),
+                coroutineId = "unknown",
+                flowId = flowId,
+                flowType = "Interval",
+                label = label ?: "interval(${periodMillis}ms)",
+                scopeId = scopeId
+            )
+        )
+        
+        val intervalFlow = flow {
+            if (initialDelayMillis > 0) {
+                delay(initialDelayMillis)
+            }
+            var counter = 0L
+            while (true) {
+                emit(counter++)
+                delay(periodMillis)
+            }
+        }
+        
+        return InstrumentedFlow(
+            delegate = intervalFlow,
+            session = session,
+            flowId = flowId,
+            flowType = "Interval",
+            label = label ?: "interval(${periodMillis}ms)"
+        )
+    }
+
+    /**
+     * Create an instrumented Flow from a range.
+     * 
+     * @param range The range of values to emit
+     * @param delayMillis Optional delay between emissions
+     * @param label Optional human-readable label
+     * @return An InstrumentedFlow that emits values from the range
+     */
+    fun vizRange(
+        range: IntRange,
+        delayMillis: Long = 0,
+        label: String? = null
+    ): InstrumentedFlow<Int> {
+        val flowId = "flow-range-${session.nextSeq()}"
+        
+        session.send(
+            FlowCreated(
+                sessionId = session.sessionId,
+                seq = session.nextSeq(),
+                tsNanos = System.nanoTime(),
+                coroutineId = "unknown",
+                flowId = flowId,
+                flowType = "Range",
+                label = label ?: "range(${range.first}..${range.last})",
+                scopeId = scopeId
+            )
+        )
+        
+        val rangeFlow = flow {
+            for (value in range) {
+                emit(value)
+                if (delayMillis > 0) {
+                    delay(delayMillis)
+                }
+            }
+        }
+        
+        return InstrumentedFlow(
+            delegate = rangeFlow,
+            session = session,
+            flowId = flowId,
+            flowType = "Range",
+            label = label ?: "range(${range.first}..${range.last})"
+        )
+    }
+
+    /**
+     * Create an instrumented Flow from a list of values.
+     * 
+     * @param values The values to emit
+     * @param delayMillis Optional delay between emissions
+     * @param label Optional human-readable label
+     * @return An InstrumentedFlow that emits the values
+     */
+    fun <T> vizFlowOf(
+        vararg values: T,
+        delayMillis: Long = 0,
+        label: String? = null
+    ): InstrumentedFlow<T> {
+        val flowId = "flow-of-${session.nextSeq()}"
+        
+        session.send(
+            FlowCreated(
+                sessionId = session.sessionId,
+                seq = session.nextSeq(),
+                tsNanos = System.nanoTime(),
+                coroutineId = "unknown",
+                flowId = flowId,
+                flowType = "FlowOf",
+                label = label ?: "flowOf(${values.size} items)",
+                scopeId = scopeId
+            )
+        )
+        
+        val listFlow = flow {
+            for (value in values) {
+                emit(value)
+                if (delayMillis > 0) {
+                    delay(delayMillis)
+                }
+            }
+        }
+        
+        return InstrumentedFlow(
+            delegate = listFlow,
+            session = session,
+            flowId = flowId,
+            flowType = "FlowOf",
+            label = label ?: "flowOf(${values.size} items)"
+        )
     }
 }
