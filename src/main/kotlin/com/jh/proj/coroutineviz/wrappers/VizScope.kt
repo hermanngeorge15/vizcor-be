@@ -357,4 +357,90 @@ class VizScope(
     fun cancel() {
         coroutineContext[Job]?.cancel()
     }
+
+    // ========================================================================
+    // Channel Builders
+    // ========================================================================
+
+    /**
+     * Create an instrumented Channel with visualization tracking.
+     * 
+     * This function creates a channel that emits events for:
+     * - Channel creation
+     * - Send/receive operations
+     * - Suspension due to backpressure
+     * - Buffer overflow
+     * - Channel close
+     * 
+     * Capacity options:
+     * - Channel.RENDEZVOUS (0) - No buffer, sender suspends until receiver is ready
+     * - Channel.UNLIMITED - Unlimited buffer, sender never suspends
+     * - Channel.CONFLATED (-1) - Single-element buffer, overwrites on new send
+     * - Channel.BUFFERED (64) - Default buffered capacity
+     * - Any positive Int - Custom buffer size
+     * 
+     * @param capacity The channel capacity
+     * @param onBufferOverflow Strategy for buffer overflow (SUSPEND, DROP_OLDEST, DROP_LATEST)
+     * @param label Optional human-readable label
+     * @return An InstrumentedChannel with visualization tracking
+     */
+    fun <E> vizChannel(
+        capacity: Int = kotlinx.coroutines.channels.Channel.RENDEZVOUS,
+        onBufferOverflow: kotlinx.coroutines.channels.BufferOverflow = kotlinx.coroutines.channels.BufferOverflow.SUSPEND,
+        label: String? = null
+    ): InstrumentedChannel<E> {
+        return session.vizChannel(capacity, onBufferOverflow, label)
+    }
+
+    /**
+     * Create an instrumented rendezvous channel (no buffer).
+     * 
+     * Sender suspends until receiver is ready, and vice versa.
+     * This is the default channel type and provides strict synchronization.
+     * 
+     * @param label Optional human-readable label
+     * @return An InstrumentedChannel with RENDEZVOUS capacity
+     */
+    fun <E> vizRendezvousChannel(label: String? = null): InstrumentedChannel<E> {
+        return session.vizRendezvousChannel(label)
+    }
+
+    /**
+     * Create an instrumented unlimited channel (unbounded buffer).
+     * 
+     * Sender never suspends - all elements are buffered.
+     * Use with caution as it can lead to memory issues.
+     * 
+     * @param label Optional human-readable label
+     * @return An InstrumentedChannel with UNLIMITED capacity
+     */
+    fun <E> vizUnlimitedChannel(label: String? = null): InstrumentedChannel<E> {
+        return session.vizUnlimitedChannel(label)
+    }
+
+    /**
+     * Create an instrumented conflated channel (single-element buffer).
+     * 
+     * Only the most recent element is kept. Sender never suspends.
+     * New sends overwrite the previous value.
+     * 
+     * @param label Optional human-readable label
+     * @return An InstrumentedChannel with CONFLATED capacity
+     */
+    fun <E> vizConflatedChannel(label: String? = null): InstrumentedChannel<E> {
+        return session.vizConflatedChannel(label)
+    }
+
+    /**
+     * Create an instrumented buffered channel (default buffer size).
+     * 
+     * Uses the default buffer size (64 elements).
+     * Sender suspends when buffer is full.
+     * 
+     * @param label Optional human-readable label
+     * @return An InstrumentedChannel with BUFFERED capacity
+     */
+    fun <E> vizBufferedChannel(label: String? = null): InstrumentedChannel<E> {
+        return session.vizBufferedChannel(label)
+    }
 }
