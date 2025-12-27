@@ -138,14 +138,6 @@ suspend fun VizScope.executeCoroutineConfig(config: CoroutineConfig): Job {
                 }
             }
         }
-
-        // Launch all children
-        val childJobs = config.children.map { childConfig ->
-            executeCoroutineConfig(childConfig)
-        }
-
-        // Wait for all children to complete (structured concurrency)
-        childJobs.forEach { it.join() }
     }
 }
 

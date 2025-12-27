@@ -1,5 +1,7 @@
 package com.jh.proj.coroutineviz.examples
 
+import com.jh.proj.coroutineviz.events.dispatcher.DispatcherSelected
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
 import com.jh.proj.coroutineviz.session.VizSession
 import com.jh.proj.coroutineviz.wrappers.VizDispatchers
 import com.jh.proj.coroutineviz.wrappers.VizScope
@@ -85,8 +87,8 @@ suspend fun dispatcherExampleScenario() = coroutineScope {
     // ========================================
     println("\n📊 Event Summary:")
     val events = session.store.all()
-    val dispatcherEvents = events.filterIsInstance<com.jh.proj.coroutineviz.events.DispatcherSelected>()
-    val threadEvents = events.filterIsInstance<com.jh.proj.coroutineviz.events.ThreadAssigned>()
+    val dispatcherEvents = events.filterIsInstance<DispatcherSelected>()
+    val threadEvents = events.filterIsInstance<ThreadAssigned>()
     
     println("   Total events: ${events.size}")
     println("   DispatcherSelected events: ${dispatcherEvents.size}")

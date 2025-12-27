@@ -1,6 +1,7 @@
 package com.jh.proj.coroutineviz.session
 
 import com.jh.proj.coroutineviz.events.VizEvent
+import com.jh.proj.coroutineviz.models.RuntimeSnapshot
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicLong
 

@@ -1,10 +1,9 @@
 package com.jh.proj.coroutineviz.wrappers
 
-import com.jh.proj.coroutineviz.events.FlowCollectionCancelled
-import com.jh.proj.coroutineviz.events.FlowCollectionCompleted
-import com.jh.proj.coroutineviz.events.FlowCollectionStarted
-import com.jh.proj.coroutineviz.events.FlowValueEmitted
-import com.jh.proj.coroutineviz.session.VizEventMain.Companion.logger
+import com.jh.proj.coroutineviz.events.flow.FlowCollectionCancelled
+import com.jh.proj.coroutineviz.events.flow.FlowCollectionCompleted
+import com.jh.proj.coroutineviz.events.flow.FlowCollectionStarted
+import com.jh.proj.coroutineviz.events.flow.FlowValueEmitted
 import com.jh.proj.coroutineviz.session.VizSession
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow

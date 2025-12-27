@@ -1,6 +1,5 @@
 package com.jh.proj.coroutineviz.wrappers
 
-import com.jh.proj.coroutineviz.events.InstrumentedDispatcher
 import com.jh.proj.coroutineviz.session.VizSession
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

@@ -1,6 +1,6 @@
 package com.jh.proj
 
-import com.jh.proj.coroutineviz.session.CoroutineState
+import com.jh.proj.coroutineviz.models.CoroutineState
 import com.jh.proj.coroutineviz.session.VizSession
 import com.jh.proj.coroutineviz.wrappers.VizScope
 import kotlinx.coroutines.delay

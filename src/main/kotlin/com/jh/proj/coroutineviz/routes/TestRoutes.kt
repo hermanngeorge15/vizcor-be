@@ -1,6 +1,6 @@
 package com.jh.proj.coroutineviz.routes
 
-import com.jh.proj.coroutineviz.session.VizEventMain
+import com.jh.proj.coroutineviz.examples.VizEventMain
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.response.*

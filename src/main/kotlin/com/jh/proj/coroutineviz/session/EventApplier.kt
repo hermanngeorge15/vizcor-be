@@ -1,16 +1,11 @@
 package com.jh.proj.coroutineviz.session
 
-import com.jh.proj.coroutineviz.events.CoroutineBodyCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCancelled
-import com.jh.proj.coroutineviz.events.CoroutineCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCreated
-import com.jh.proj.coroutineviz.events.CoroutineFailed
-import com.jh.proj.coroutineviz.events.CoroutineResumed
-import com.jh.proj.coroutineviz.events.CoroutineStarted
-import com.jh.proj.coroutineviz.events.CoroutineSuspended
-import com.jh.proj.coroutineviz.events.ThreadAssigned
 import com.jh.proj.coroutineviz.events.VizEvent
-import com.jh.proj.coroutineviz.session.VizEventMain.Companion.logger
+import com.jh.proj.coroutineviz.events.coroutine.*
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
+import com.jh.proj.coroutineviz.models.CoroutineNode
+import com.jh.proj.coroutineviz.models.CoroutineState
+import com.jh.proj.coroutineviz.models.RuntimeSnapshot
 import org.slf4j.LoggerFactory
 
 class EventApplier(
@@ -103,7 +98,7 @@ class EventApplier(
         snapshot.coroutines[e.coroutineId]?.state = CoroutineState.FAILED
     }
 
-    companion object{
+    companion object {
         private val logger = LoggerFactory.getLogger(EventApplier::class.java)
     }
 }

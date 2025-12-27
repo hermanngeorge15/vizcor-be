@@ -1,6 +1,6 @@
 package com.jh.proj.coroutineviz.session
 
-import kotlinx.serialization.Serializable
+import com.jh.proj.coroutineviz.models.SessionInfo
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -74,11 +74,3 @@ object SessionManager {
         logger.info("Cleared all sessions: $count removed")
     }
 }
-
-@Serializable
-data class SessionInfo(
-    val sessionId: String,
-    val coroutineCount: Int,
-    val eventCount: Int
-)
-

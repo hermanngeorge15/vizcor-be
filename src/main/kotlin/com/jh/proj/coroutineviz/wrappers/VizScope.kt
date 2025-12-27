@@ -1,9 +1,8 @@
 package com.jh.proj.coroutineviz.wrappers
 
-import com.jh.proj.coroutineviz.events.DeferredValueAvailable
-import com.jh.proj.coroutineviz.events.InstrumentedDeferred
+import com.jh.proj.coroutineviz.events.deferred.DeferredValueAvailable
 import com.jh.proj.coroutineviz.events.SuspensionPoint
-import com.jh.proj.coroutineviz.events.ThreadAssigned
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
 import com.jh.proj.coroutineviz.session.EventContext
 import com.jh.proj.coroutineviz.session.VizSession
 import com.jh.proj.coroutineviz.session.coroutineBodyCompleted
