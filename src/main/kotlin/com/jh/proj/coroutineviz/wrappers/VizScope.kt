@@ -176,6 +176,10 @@ class VizScope(
         return job
     }
 
+    /**
+     * Async counterpart to vizLaunch that emits lifecycle events and returns an InstrumentedDeferred
+     * so awaiters are tracked (await start/completion and awaiter suspension/resume).
+     */
     suspend fun <T> vizAsync(
         label: String? = null,
         context: CoroutineContext = EmptyCoroutineContext,
@@ -309,6 +313,9 @@ class VizScope(
         )
     }
 
+    /**
+     * Suspend with delay while emitting suspension/resume events when running inside a viz instrumented coroutine.
+     */
     suspend fun vizDelay(timeMillis: Long) {
         val coroutineElement = currentCoroutineContext()[VizCoroutineElement]
 
