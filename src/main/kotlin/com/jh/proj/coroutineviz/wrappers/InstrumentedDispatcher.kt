@@ -6,6 +6,10 @@ import com.jh.proj.coroutineviz.session.VizSession
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlin.coroutines.CoroutineContext
 
+/**
+ * CoroutineDispatcher wrapper that records dispatcher selection and the thread
+ * that ultimately executes the runnable before delegating to the real dispatcher.
+ */
 class InstrumentedDispatcher(
     private val delegate: CoroutineDispatcher,
     private val session: VizSession,

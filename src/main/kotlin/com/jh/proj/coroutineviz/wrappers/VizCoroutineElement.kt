@@ -2,6 +2,10 @@ package com.jh.proj.coroutineviz.wrappers
 
 import kotlin.coroutines.CoroutineContext
 
+/**
+ * CoroutineContext element that carries visualization identifiers so events can be attributed
+ * to the correct coroutine/job/scope hierarchy.
+ */
 data class VizCoroutineElement(
     val coroutineId: String,
     val jobId: String,
