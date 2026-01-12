@@ -323,6 +323,7 @@ object ScenarioRunner {
         }
 
         logger.info("Order processing scenario launched...")
+        job.join()
         job
     }
 
@@ -427,6 +428,7 @@ object ScenarioRunner {
         }
 
         logger.info("User registration scenario launched...")
+        job.join()
         job
     }
 
@@ -564,6 +566,7 @@ object ScenarioRunner {
         }
 
         logger.info("Report generation scenario launched...")
+        job.join()
         job
     }
 }
