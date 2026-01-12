@@ -5,8 +5,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Event emitted when job.cancel() is explicitly called.
- * This is different from CoroutineCancelled which is emitted when cancellation completes.
+ * Emitted when [Job.cancel] is explicitly called.
+ *
+ * This marks the *request* for cancellation, not completion. The actual
+ * cancellation may take time as the coroutine reaches suspension points.
+ * [CoroutineCancelled] is emitted when cancellation actually completes.
+ *
+ * @property requestedBy ID of the coroutine/entity that requested cancellation
+ * @property cause Reason for cancellation, if provided
  */
 @Serializable
 @SerialName("JobCancellationRequested")

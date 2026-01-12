@@ -4,6 +4,14 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a new coroutine is created via [vizLaunch] or [vizAsync].
+ *
+ * This is the first event in a coroutine's lifecycle. At this point the
+ * coroutine exists but has not yet started executing.
+ *
+ * Lifecycle: CREATED → [CoroutineStarted]
+ */
 @Serializable
 @SerialName("CoroutineCreated")
 data class CoroutineCreated(
