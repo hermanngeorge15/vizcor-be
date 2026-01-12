@@ -4,6 +4,14 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a coroutine begins executing its body.
+ *
+ * This event marks the transition from CREATED to ACTIVE state.
+ * The coroutine is now running on a thread.
+ *
+ * Lifecycle: [CoroutineCreated] → STARTED → (execution)
+ */
 @Serializable
 @SerialName("CoroutineStarted")
 data class CoroutineStarted(

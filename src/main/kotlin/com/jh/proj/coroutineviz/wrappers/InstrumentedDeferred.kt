@@ -10,6 +10,32 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.InternalForInheritanceCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 
+/**
+ * Deferred wrapper that emits await lifecycle events for visualization.
+ *
+ * InstrumentedDeferred wraps a standard [Deferred] and emits events when
+ * [await] is called, enabling visualization of async/await patterns and
+ * the suspension/resumption of awaiting coroutines.
+ *
+ * Events emitted:
+ * - [DeferredAwaitStarted] when await() is called
+ * - [CoroutineSuspended] when the awaiting coroutine suspends
+ * - [CoroutineResumed] when the awaiting coroutine resumes
+ * - [DeferredAwaitCompleted] when await() returns
+ *
+ * Created automatically by [VizScope.vizAsync] - you typically don't
+ * instantiate this directly.
+ *
+ * @param T The type of value this Deferred produces
+ * @property delegate The underlying Deferred to delegate operations to
+ * @property session The visualization session for emitting events
+ * @property deferredId Unique identifier for this Deferred instance
+ * @property coroutineId ID of the coroutine that owns this Deferred
+ * @property jobId ID of the associated Job
+ * @property parentCoroutineId ID of the parent coroutine, if any
+ * @property scopeId ID of the owning VizScope
+ * @property label Optional human-readable label
+ */
 @OptIn(InternalForInheritanceCoroutinesApi::class)
 class InstrumentedDeferred<T>(
     private val delegate: Deferred<T>,
@@ -21,6 +47,19 @@ class InstrumentedDeferred<T>(
     private val scopeId: String,
     private val label: String?
 ) : Deferred<T> by delegate {
+
+    /**
+     * Await the deferred value with visualization tracking.
+     *
+     * This override emits events to track the await lifecycle:
+     * 1. [DeferredAwaitStarted] - when await begins
+     * 2. [CoroutineSuspended] - when the caller suspends (if not immediately available)
+     * 3. [CoroutineResumed] - when the caller resumes with the value
+     * 4. [DeferredAwaitCompleted] - when await returns
+     *
+     * @return The computed value
+     * @throws CancellationException if the deferred was cancelled
+     */
     override suspend fun await(): T {
         val awaiterId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
 

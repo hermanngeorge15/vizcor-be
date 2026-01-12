@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
 
+/**
+ * Flow wrapper that emits collection start/finish/cancel events and each value emission
+ * without altering the upstream Flow logic.
+ */
 class InstrumentedFlow<T>(
     private val delegate: Flow<T>,
     private val session: VizSession,

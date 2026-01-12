@@ -4,6 +4,16 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a coroutine has fully completed.
+ *
+ * This is a terminal event indicating successful completion. Both the
+ * coroutine's own code and all child coroutines have finished successfully.
+ * This is one of the three possible terminal states (along with
+ * [CoroutineCancelled] and [CoroutineFailed]).
+ *
+ * Lifecycle: [CoroutineBodyCompleted] → COMPLETED (terminal)
+ */
 @Serializable
 @SerialName("CoroutineCompleted")
 data class CoroutineCompleted(

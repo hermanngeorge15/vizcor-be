@@ -4,6 +4,15 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a suspended coroutine resumes execution.
+ *
+ * This event marks the transition back from SUSPENDED to ACTIVE state.
+ * The coroutine has been assigned a thread and continues executing
+ * from where it suspended.
+ *
+ * Lifecycle: [CoroutineSuspended] → RESUMED → (continues execution)
+ */
 @Serializable
 @SerialName("CoroutineResumed")
 data class CoroutineResumed(
