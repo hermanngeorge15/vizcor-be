@@ -126,6 +126,67 @@ fun Route.registerScenarioRunnerRoutes() {
         }
     }
 
+    // ============================================================================
+    // REALISTIC SCENARIOS - Real-world service simulations
+    // ============================================================================
+
+    post("/api/scenarios/order-processing") {
+        val sessionId = call.request.queryParameters["sessionId"]
+        val shouldFail = call.request.queryParameters["fail"]?.toBoolean() ?: false
+        val session = getOrCreateSession(sessionId)
+
+        logger.info("Running Order Processing scenario (fail=$shouldFail) in session: ${session.sessionId}")
+
+        call.runScenarioWithResponse(session) {
+            ScenarioRunner.runOrderProcessingScenario(session, shouldFail)
+            ScenarioCompletionResponse(
+                success = true,
+                sessionId = session.sessionId,
+                message = "Order Processing scenario completed",
+                coroutineCount = session.snapshot.coroutines.size,
+                eventCount = session.store.all().size
+            )
+        }
+    }
+
+    post("/api/scenarios/user-registration") {
+        val sessionId = call.request.queryParameters["sessionId"]
+        val shouldFailEmail = call.request.queryParameters["failEmail"]?.toBoolean() ?: false
+        val session = getOrCreateSession(sessionId)
+
+        logger.info("Running User Registration scenario (failEmail=$shouldFailEmail) in session: ${session.sessionId}")
+
+        call.runScenarioWithResponse(session) {
+            ScenarioRunner.runUserRegistrationScenario(session, shouldFailEmail)
+            ScenarioCompletionResponse(
+                success = true,
+                sessionId = session.sessionId,
+                message = "User Registration scenario completed",
+                coroutineCount = session.snapshot.coroutines.size,
+                eventCount = session.store.all().size
+            )
+        }
+    }
+
+    post("/api/scenarios/report-generation") {
+        val sessionId = call.request.queryParameters["sessionId"]
+        val shouldTimeout = call.request.queryParameters["timeout"]?.toBoolean() ?: false
+        val session = getOrCreateSession(sessionId)
+
+        logger.info("Running Report Generation scenario (timeout=$shouldTimeout) in session: ${session.sessionId}")
+
+        call.runScenarioWithResponse(session) {
+            ScenarioRunner.runReportGenerationScenario(session, shouldTimeout)
+            ScenarioCompletionResponse(
+                success = true,
+                sessionId = session.sessionId,
+                message = "Report Generation scenario completed",
+                coroutineCount = session.snapshot.coroutines.size,
+                eventCount = session.store.all().size
+            )
+        }
+    }
+
     post("/api/scenarios/custom") {
         logger.info("Received custom scenario configuration request")
 
@@ -187,41 +248,73 @@ fun Route.registerScenarioRunnerRoutes() {
             HttpStatusCode.OK,
             mapOf(
                 "scenarios" to listOf(
+                    // ========== REALISTIC SCENARIOS (Featured) ==========
+                    mapOf(
+                        "id" to "order-processing",
+                        "name" to "🛒 Order Processing",
+                        "description" to "E-commerce flow: validation → inventory check → payment → database → notifications (parallel). Use ?fail=true to simulate payment failure.",
+                        "endpoint" to "/api/scenarios/order-processing",
+                        "category" to "realistic",
+                        "duration" to "~15-20 seconds"
+                    ),
+                    mapOf(
+                        "id" to "user-registration",
+                        "name" to "👤 User Registration",
+                        "description" to "Complete registration: validation → DB check → create user → parallel setup (profile, settings, avatar) → notifications. Use ?failEmail=true to simulate email retry.",
+                        "endpoint" to "/api/scenarios/user-registration",
+                        "category" to "realistic",
+                        "duration" to "~18-25 seconds"
+                    ),
+                    mapOf(
+                        "id" to "report-generation",
+                        "name" to "📊 Report Generation",
+                        "description" to "Data pipeline: parallel API fetches → data aggregation → PDF generation → parallel delivery (S3, email, Slack). Use ?timeout=true to simulate API timeout.",
+                        "endpoint" to "/api/scenarios/report-generation",
+                        "category" to "realistic",
+                        "duration" to "~25-35 seconds"
+                    ),
+                    // ========== BASIC SCENARIOS ==========
                     mapOf(
                         "id" to "nested",
                         "name" to "Nested Coroutines",
                         "description" to "Demonstrates parent-child relationships and structured concurrency",
-                        "endpoint" to "/api/scenarios/nested"
+                        "endpoint" to "/api/scenarios/nested",
+                        "category" to "basic"
                     ),
                     mapOf(
                         "id" to "parallel",
                         "name" to "Parallel Execution",
                         "description" to "Multiple coroutines running in parallel",
-                        "endpoint" to "/api/scenarios/parallel"
+                        "endpoint" to "/api/scenarios/parallel",
+                        "category" to "basic"
                     ),
                     mapOf(
                         "id" to "cancellation",
                         "name" to "Cancellation",
                         "description" to "Demonstrates coroutine cancellation and cleanup",
-                        "endpoint" to "/api/scenarios/cancellation"
+                        "endpoint" to "/api/scenarios/cancellation",
+                        "category" to "basic"
                     ),
                     mapOf(
                         "id" to "deep-nesting",
                         "name" to "Deep Nesting",
                         "description" to "Deep hierarchy of nested coroutines (configurable depth)",
-                        "endpoint" to "/api/scenarios/deep-nesting?depth=5"
+                        "endpoint" to "/api/scenarios/deep-nesting?depth=5",
+                        "category" to "basic"
                     ),
                     mapOf(
                         "id" to "mixed",
                         "name" to "Mixed Sequential/Parallel",
                         "description" to "Combination of sequential and parallel execution",
-                        "endpoint" to "/api/scenarios/mixed"
+                        "endpoint" to "/api/scenarios/mixed",
+                        "category" to "basic"
                     ),
                     mapOf(
                         "id" to "exception",
                         "name" to "Exception Handling",
                         "description" to "Demonstrates exception tracking and failure states",
-                        "endpoint" to "/api/scenarios/exception"
+                        "endpoint" to "/api/scenarios/exception",
+                        "category" to "basic"
                     )
                 )
             )
