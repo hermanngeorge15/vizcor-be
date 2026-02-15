@@ -1,7 +1,10 @@
 package com.jh.proj.coroutineviz.wrappers
 
+import com.jh.proj.coroutineviz.events.dispatcher.DispatcherSelected
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
 import com.jh.proj.coroutineviz.session.VizSession
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
@@ -12,7 +15,7 @@ class VizDispatchersIntegrationTest {
 
     @Test
     @DisplayName("Integration: Complete scenario with mixed dispatchers")
-    fun testCompleteScenarioWithMixedDispatchers() = runBlocking {
+    fun testCompleteScenarioWithMixedDispatchers() = runTest {
         // Simulate a real-world scenario
         val session = VizSession("integration-mixed-dispatchers")
         val dispatchers = VizDispatchers(session, scopeId = "api-handlers")
@@ -53,15 +56,10 @@ class VizDispatchersIntegrationTest {
         assertEquals(3, coroutineEvents.size, "Should have 3 coroutines")
         
         // Should have both Default and IO dispatchers
-        val eventJson = dispatcherEvents.map { event ->
-            kotlinx.serialization.json.Json.encodeToString(
-                com.jh.proj.coroutineviz.events.VizEvent.serializer(),
-                event
-            )
-        }
+        val dispatcherSelectedEvents = dispatcherEvents.filterIsInstance<DispatcherSelected>()
         
-        val hasDefault = eventJson.any { it.contains("Dispatchers.Default") }
-        val hasIO = eventJson.any { it.contains("Dispatchers.IO") }
+        val hasDefault = dispatcherSelectedEvents.any { it.dispatcherName == "Dispatchers.Default" }
+        val hasIO = dispatcherSelectedEvents.any { it.dispatcherName == "Dispatchers.IO" }
         
         assertTrue(hasDefault, "Should use Default dispatcher")
         assertTrue(hasIO, "Should use IO dispatcher")
@@ -178,24 +176,14 @@ class VizDispatchersIntegrationTest {
             
             assertTrue(dispatcherEvents.size >= 5, "Should have at least 5 dispatcher events, got ${dispatcherEvents.size}")
             
-            val hasCustom = dispatcherEvents.any { event ->
-                val json = kotlinx.serialization.json.Json.encodeToString(
-                    com.jh.proj.coroutineviz.events.VizEvent.serializer(),
-                    event
-                )
-                json.contains("CustomThreadPool")
-            }
+            val dispatcherSelectedEvents = dispatcherEvents.filterIsInstance<DispatcherSelected>()
+            val hasCustom = dispatcherSelectedEvents.any { it.dispatcherName == "CustomThreadPool" }
             
             assertTrue(hasCustom, "Should use CustomThreadPool")
             
             // Verify threads were named correctly
-            val hasCustomThread = threadEvents.any { event ->
-                val json = kotlinx.serialization.json.Json.encodeToString(
-                    com.jh.proj.coroutineviz.events.VizEvent.serializer(),
-                    event
-                )
-                json.contains("CustomWorker")
-            }
+            val threadAssignedEvents = threadEvents.filterIsInstance<ThreadAssigned>()
+            val hasCustomThread = threadAssignedEvents.any { it.threadName.contains("CustomWorker") }
             
             assertTrue(hasCustomThread, "Should run on CustomWorker threads")
             
@@ -237,7 +225,7 @@ class VizDispatchersIntegrationTest {
         
         // Verify all levels were tracked
         val events = session.store.all()
-        val dispatcherEvents = events.filterIsInstance<com.jh.proj.coroutineviz.events.DispatcherSelected>()
+        val dispatcherEvents = events.filterIsInstance<DispatcherSelected>()
         
         // Deep nesting with dispatcher switches should generate multiple dispatcher events
         assertTrue(dispatcherEvents.isNotEmpty(), "Should have dispatcher events for nested levels, got ${dispatcherEvents.size}")
@@ -273,7 +261,7 @@ class VizDispatchersIntegrationTest {
         
         // Verify events were tracked despite exception
         val events = session.store.all()
-        val dispatcherEvents = events.filterIsInstance<com.jh.proj.coroutineviz.events.DispatcherSelected>()
+        val dispatcherEvents = events.filterIsInstance<DispatcherSelected>()
         
         assertTrue(dispatcherEvents.isNotEmpty(), "Should have dispatcher events even with exceptions")
         

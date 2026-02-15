@@ -15,14 +15,14 @@ import kotlin.time.Duration
 
 /**
  * InstrumentedFlow wraps a Flow to emit visualization events for all operations.
- * 
+ *
  * Features:
  * - Tracks flow creation, collection, and completion
  * - Monitors value emissions with sequence numbers
  * - Detects backpressure and buffer overflows
  * - Tracks operator chains (map, filter, transform, etc.)
  * - Supports multiple collectors
- * 
+ *
  * @param T The type of values emitted by the flow
  * @param delegate The underlying Flow to wrap
  * @param session The VizSession for event tracking
@@ -136,15 +136,15 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "map"
         val newIndex = operatorIndex + 1
-        
+
         // Emit operator applied event
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val transformedFlow = delegate.map { value ->
             val result = transform(value)
-            
+
             // Emit transformation event
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
             session.send(
@@ -162,10 +162,10 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             result
         }
-        
+
         return InstrumentedFlow(
             delegate = transformedFlow,
             session = session,
@@ -184,16 +184,16 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "mapNotNull"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val transformedFlow = delegate.mapNotNull { value ->
             val result = transform(value)
-            
+
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             if (result != null) {
                 session.send(
                     FlowValueTransformed(
@@ -226,10 +226,10 @@ class InstrumentedFlow<T>(
                     )
                 )
             }
-            
+
             result
         }
-        
+
         return InstrumentedFlow(
             delegate = transformedFlow,
             session = session,
@@ -250,16 +250,16 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "transform"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var inputSequence = 0
         var outputSequence = 0
-        
+
         val transformedFlow = delegate.transform { inputValue ->
             val inputSeq = inputSequence++
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             // Wrap the collector to track outputs
             val wrappedCollector = object : FlowCollector<R> {
                 override suspend fun emit(value: R) {
@@ -281,10 +281,10 @@ class InstrumentedFlow<T>(
                     this@transform.emit(value)
                 }
             }
-            
+
             transform(wrappedCollector, inputValue)
         }
-        
+
         return InstrumentedFlow(
             delegate = transformedFlow,
             session = session,
@@ -307,15 +307,15 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "filter"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val filteredFlow = delegate.filter { value ->
             val passed = predicate(value)
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueFiltered(
                     sessionId = session.sessionId,
@@ -330,10 +330,10 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             passed
         }
-        
+
         return InstrumentedFlow(
             delegate = filteredFlow,
             session = session,
@@ -352,15 +352,15 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "filterNot"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val filteredFlow = delegate.filterNot { value ->
             val matches = predicate(value)
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueFiltered(
                     sessionId = session.sessionId,
@@ -375,10 +375,10 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             matches
         }
-        
+
         return InstrumentedFlow(
             delegate = filteredFlow,
             session = session,
@@ -398,15 +398,15 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "filterIsInstance<${clazz.simpleName}>"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val filteredFlow = delegate.transform { value ->
             val isInstance = clazz.isInstance(value)
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueFiltered(
                     sessionId = session.sessionId,
@@ -421,13 +421,13 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             if (isInstance) {
                 @Suppress("UNCHECKED_CAST")
                 emit(value as R)
             }
         }
-        
+
         return InstrumentedFlow(
             delegate = filteredFlow,
             session = session,
@@ -446,16 +446,16 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "distinctUntilChanged"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
         var previousValue: Any? = UNSET
-        
+
         val filteredFlow = delegate.transform { value ->
             val isDifferent = previousValue === UNSET || previousValue != value
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueFiltered(
                     sessionId = session.sessionId,
@@ -470,13 +470,13 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             if (isDifferent) {
                 previousValue = value
                 emit(value)
             }
         }
-        
+
         return InstrumentedFlow(
             delegate = filteredFlow,
             session = session,
@@ -499,9 +499,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "take($count)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.take(count),
             session = session,
@@ -520,15 +520,15 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "takeWhile"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val takenFlow = delegate.takeWhile { value ->
             val take = predicate(value)
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueFiltered(
                     sessionId = session.sessionId,
@@ -543,10 +543,10 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             take
         }
-        
+
         return InstrumentedFlow(
             delegate = takenFlow,
             session = session,
@@ -565,9 +565,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "drop($count)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.drop(count),
             session = session,
@@ -586,9 +586,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "dropWhile"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.dropWhile(predicate),
             session = session,
@@ -611,14 +611,14 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "onEach"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         var sequenceNumber = 0
-        
+
         val sideEffectFlow = delegate.onEach { value ->
             val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId
-            
+
             session.send(
                 FlowValueTransformed(
                     sessionId = session.sessionId,
@@ -634,10 +634,10 @@ class InstrumentedFlow<T>(
                     coroutineId = coroutineId
                 )
             )
-            
+
             action(value)
         }
-        
+
         return InstrumentedFlow(
             delegate = sideEffectFlow,
             session = session,
@@ -656,9 +656,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "onStart"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.onStart(action),
             session = session,
@@ -677,9 +677,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "onCompletion"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.onCompletion(action),
             session = session,
@@ -706,9 +706,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "buffer($capacity, $onBufferOverflow)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.buffer(capacity, onBufferOverflow),
             session = session,
@@ -727,9 +727,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "conflate"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.conflate(),
             session = session,
@@ -753,9 +753,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "debounce(${timeoutMillis}ms)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.debounce(timeoutMillis),
             session = session,
@@ -775,9 +775,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "sample(${periodMillis}ms)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.sample(periodMillis),
             session = session,
@@ -800,9 +800,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "catch"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.catch(action),
             session = session,
@@ -824,9 +824,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = if (retries == Long.MAX_VALUE) "retry" else "retry($retries)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.retry(retries, predicate),
             session = session,
@@ -850,9 +850,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "flatMapConcat"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.flatMapConcat(transform),
             session = session,
@@ -875,9 +875,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "flatMapMerge($concurrency)"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.flatMapMerge(concurrency, transform),
             session = session,
@@ -897,9 +897,9 @@ class InstrumentedFlow<T>(
         val newFlowId = "flow-${session.nextSeq()}"
         val operatorName = "flatMapLatest"
         val newIndex = operatorIndex + 1
-        
+
         session.send(ctx.forOperator(newFlowId, operatorName, newIndex).flowOperatorApplied(operatorName))
-        
+
         return InstrumentedFlow(
             delegate = delegate.flatMapLatest(transform),
             session = session,
@@ -917,13 +917,13 @@ class InstrumentedFlow<T>(
 
     /**
      * Launch collection of this flow in the given scope.
-     * 
+     *
      * This is the equivalent of `launchIn` but with visualization tracking.
      * The collection runs in a new coroutine and emits events for:
      * - Coroutine launch
      * - Collection start/complete/cancel
      * - All value emissions
-     * 
+     *
      * @param scope The CoroutineScope to launch in
      * @param onEach Optional action for each emitted value
      * @return Job handle for the collection coroutine
@@ -933,7 +933,7 @@ class InstrumentedFlow<T>(
         onEach: (suspend (T) -> Unit)? = null
     ): Job {
         val coroutineId = "flow-collector-${session.nextSeq()}"
-        
+
         session.send(
             FlowOperatorApplied(
                 sessionId = session.sessionId,
@@ -947,7 +947,7 @@ class InstrumentedFlow<T>(
                 coroutineId = coroutineId
             )
         )
-        
+
         return scope.launch {
             if (onEach != null) {
                 collect { value -> onEach(value) }
@@ -959,7 +959,7 @@ class InstrumentedFlow<T>(
 
     /**
      * Convert this cold flow to a hot SharedFlow.
-     * 
+     *
      * @param scope The CoroutineScope for the sharing coroutine
      * @param started The sharing start strategy
      * @param replay Number of values to replay to new subscribers
@@ -972,7 +972,7 @@ class InstrumentedFlow<T>(
         replay: Int = 0
     ): SharedFlow<T> {
         val sharedFlowId = "sharedflow-from-${flowId}-${session.nextSeq()}"
-        
+
         session.send(
             FlowOperatorApplied(
                 sessionId = session.sessionId,
@@ -986,10 +986,10 @@ class InstrumentedFlow<T>(
                 coroutineId = null
             )
         )
-        
+
         // Create the shared flow
         val sharedFlow = delegate.shareIn(scope, started, replay)
-        
+
         // Emit FlowCreated for the new SharedFlow
         session.send(
             FlowCreated(
@@ -1003,13 +1003,13 @@ class InstrumentedFlow<T>(
                 scopeId = null
             )
         )
-        
+
         return sharedFlow
     }
 
     /**
      * Convert this cold flow to a hot StateFlow.
-     * 
+     *
      * @param scope The CoroutineScope for the state coroutine
      * @param started The sharing start strategy
      * @param initialValue The initial value of the StateFlow
@@ -1022,7 +1022,7 @@ class InstrumentedFlow<T>(
         initialValue: T
     ): StateFlow<T> {
         val stateFlowId = "stateflow-from-${flowId}-${session.nextSeq()}"
-        
+
         session.send(
             FlowOperatorApplied(
                 sessionId = session.sessionId,
@@ -1036,10 +1036,10 @@ class InstrumentedFlow<T>(
                 coroutineId = null
             )
         )
-        
+
         // Create the state flow
         val stateFlow = delegate.stateIn(scope, started, initialValue)
-        
+
         // Emit FlowCreated for the new StateFlow
         session.send(
             FlowCreated(
@@ -1053,7 +1053,7 @@ class InstrumentedFlow<T>(
                 scopeId = null
             )
         )
-        
+
         return stateFlow
     }
 
@@ -1067,14 +1067,14 @@ class InstrumentedFlow<T>(
     suspend fun vizFirst(): T {
         val collectorId = "first-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         val result = delegate.first()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, 0, result))
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, 1, 0))
-        
+
         return result
     }
 
@@ -1084,14 +1084,14 @@ class InstrumentedFlow<T>(
     suspend fun vizFirst(predicate: suspend (T) -> Boolean): T {
         val collectorId = "first-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         val result = delegate.first(predicate)
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, 0, result))
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, 1, 0))
-        
+
         return result
     }
 
@@ -1101,18 +1101,18 @@ class InstrumentedFlow<T>(
     suspend fun vizFirstOrNull(): T? {
         val collectorId = "firstOrNull-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         val result = delegate.firstOrNull()
-        
+
         if (result != null) {
             session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, 0, result))
             session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, 1, 0))
         } else {
             session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, 0, 0))
         }
-        
+
         return result
     }
 
@@ -1123,15 +1123,15 @@ class InstrumentedFlow<T>(
         val collectorId = "last-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         var count = 0
         val result = delegate.onEach { count++ }.last()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, count - 1, result))
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, count, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1142,16 +1142,16 @@ class InstrumentedFlow<T>(
         val collectorId = "toList-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         var count = 0
-        val result = delegate.onEach { 
+        val result = delegate.onEach {
             session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, count++, it))
         }.toList()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, count, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1162,16 +1162,16 @@ class InstrumentedFlow<T>(
         val collectorId = "toSet-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         var count = 0
-        val result = delegate.onEach { 
+        val result = delegate.onEach {
             session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, count++, it))
         }.toSet()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, count, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1182,13 +1182,13 @@ class InstrumentedFlow<T>(
         val collectorId = "count-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         val result = delegate.count()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, result, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1199,15 +1199,15 @@ class InstrumentedFlow<T>(
         val collectorId = "reduce-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         var count = 0
         val result = delegate.onEach { count++ }.reduce(operation)
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, count - 1, result))
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, count, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1218,15 +1218,15 @@ class InstrumentedFlow<T>(
         val collectorId = "fold-${session.nextSeq()}"
         val coroutineId = currentCoroutineContext()[VizCoroutineElement]?.coroutineId ?: "unknown"
         val startTime = System.nanoTime()
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionStarted(collectorId))
-        
+
         var count = 0
         val result = delegate.onEach { count++ }.fold(initial, operation)
-        
+
         session.send(ctx.copy(coroutineId = coroutineId).flowValueEmitted(collectorId, count, result))
         session.send(ctx.copy(coroutineId = coroutineId).flowCollectionCompleted(collectorId, count, System.nanoTime() - startTime))
-        
+
         return result
     }
 
@@ -1263,7 +1263,7 @@ fun <T> Flow<T>.instrumented(
             scopeId = null
         )
     )
-    
+
     return InstrumentedFlow(this, session, flowId, flowType, label)
 }
 

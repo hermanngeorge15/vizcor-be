@@ -1,6 +1,9 @@
 package com.jh.proj.coroutineviz.session
 
-import com.jh.proj.coroutineviz.events.*
+import com.jh.proj.coroutineviz.events.SuspensionPoint
+import com.jh.proj.coroutineviz.events.coroutine.*
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
+import com.jh.proj.coroutineviz.events.job.*
 
 /**
  * EventContext carries common coroutine metadata for event creation.

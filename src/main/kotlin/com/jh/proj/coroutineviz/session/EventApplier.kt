@@ -1,18 +1,33 @@
 package com.jh.proj.coroutineviz.session
 
-import com.jh.proj.coroutineviz.events.CoroutineBodyCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCancelled
-import com.jh.proj.coroutineviz.events.CoroutineCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCreated
-import com.jh.proj.coroutineviz.events.CoroutineFailed
-import com.jh.proj.coroutineviz.events.CoroutineResumed
-import com.jh.proj.coroutineviz.events.CoroutineStarted
-import com.jh.proj.coroutineviz.events.CoroutineSuspended
-import com.jh.proj.coroutineviz.events.ThreadAssigned
 import com.jh.proj.coroutineviz.events.VizEvent
-import com.jh.proj.coroutineviz.session.VizEventMain.Companion.logger
+import com.jh.proj.coroutineviz.events.coroutine.*
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
+import com.jh.proj.coroutineviz.models.CoroutineNode
+import com.jh.proj.coroutineviz.models.CoroutineState
+import com.jh.proj.coroutineviz.models.RuntimeSnapshot
 import org.slf4j.LoggerFactory
 
+/**
+ * Applies events to update the [RuntimeSnapshot] state.
+ *
+ * The EventApplier is responsible for translating events into state changes
+ * in the runtime snapshot. It implements the "apply" side of event sourcing,
+ * where events are the source of truth and state is derived from them.
+ *
+ * Each event type triggers specific state transitions:
+ * - [CoroutineCreated] → Creates new [CoroutineNode] with CREATED state
+ * - [CoroutineStarted] → Transitions to ACTIVE state
+ * - [CoroutineSuspended] → Transitions to SUSPENDED state
+ * - [CoroutineResumed] → Transitions back to ACTIVE state
+ * - [CoroutineBodyCompleted] → Transitions to WAITING_FOR_CHILDREN state
+ * - [CoroutineCompleted] → Transitions to COMPLETED state
+ * - [CoroutineCancelled] → Transitions to CANCELLED state
+ * - [CoroutineFailed] → Transitions to FAILED state
+ * - [ThreadAssigned] → Updates thread information on the node
+ *
+ * @property snapshot The runtime snapshot to update
+ */
 class EventApplier(
     private val snapshot: RuntimeSnapshot
 ) {
@@ -103,7 +118,7 @@ class EventApplier(
         snapshot.coroutines[e.coroutineId]?.state = CoroutineState.FAILED
     }
 
-    companion object{
+    companion object {
         private val logger = LoggerFactory.getLogger(EventApplier::class.java)
     }
 }

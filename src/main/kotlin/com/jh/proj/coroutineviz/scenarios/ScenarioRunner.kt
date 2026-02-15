@@ -59,7 +59,7 @@ object ScenarioRunner {
         val job = viz.vizLaunch("coordinator") {
             val jobs = List(5) { index ->
                 vizLaunch("worker-$index") {
-                    val workTime = (100..300).random()
+                    val workTime = (2000..3000).random()
                     logger.debug("Worker-$index starting (will work for ${workTime}ms)")
                     vizDelay(workTime.toLong())
                     logger.debug("Worker-$index completed")

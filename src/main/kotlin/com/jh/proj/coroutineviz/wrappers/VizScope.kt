@@ -184,6 +184,10 @@ class VizScope(
         return job
     }
 
+    /**
+     * Async counterpart to vizLaunch that emits lifecycle events and returns an InstrumentedDeferred
+     * so awaiters are tracked (await start/completion and awaiter suspension/resume).
+     */
     suspend fun <T> vizAsync(
         label: String? = null,
         context: CoroutineContext = EmptyCoroutineContext,
@@ -317,6 +321,9 @@ class VizScope(
         )
     }
 
+    /**
+     * Suspend with delay while emitting suspension/resume events when running inside a viz instrumented coroutine.
+     */
     suspend fun vizDelay(timeMillis: Long) {
         val coroutineElement = currentCoroutineContext()[VizCoroutineElement]
 
@@ -371,13 +378,13 @@ class VizScope(
 
     /**
      * Create an instrumented Flow with visualization tracking.
-     * 
+     *
      * This function wraps a flow builder to emit events for:
      * - Flow creation
      * - Collection start/complete/cancel
      * - Value emissions with sequence numbers
      * - Operator applications
-     * 
+     *
      * Usage:
      * ```kotlin
      * val flow = scope.vizFlow("my-flow") {
@@ -385,10 +392,10 @@ class VizScope(
      *     emit(2)
      *     emit(3)
      * }
-     * 
+     *
      * flow.collect { println(it) }
      * ```
-     * 
+     *
      * @param label Optional human-readable label for the flow
      * @param block The flow builder block
      * @return An InstrumentedFlow that tracks all operations
@@ -398,12 +405,12 @@ class VizScope(
         block: suspend FlowCollector<T>.() -> Unit
     ): InstrumentedFlow<T> {
         val flowId = "flow-${session.nextSeq()}"
-        val coroutineId = runCatching { 
-            kotlinx.coroutines.runBlocking { 
-                currentCoroutineContext()[VizCoroutineElement]?.coroutineId 
-            } 
+        val coroutineId = runCatching {
+            kotlinx.coroutines.runBlocking {
+                currentCoroutineContext()[VizCoroutineElement]?.coroutineId
+            }
         }.getOrNull()
-        
+
         // Emit FlowCreated event
         session.send(
             FlowCreated(
@@ -417,10 +424,10 @@ class VizScope(
                 scopeId = scopeId
             )
         )
-        
+
         // Create the underlying flow
         val underlyingFlow = flow(block)
-        
+
         // Wrap it with instrumentation
         return InstrumentedFlow(
             delegate = underlyingFlow,
@@ -433,9 +440,9 @@ class VizScope(
 
     /**
      * Wrap an existing Flow with instrumentation.
-     * 
+     *
      * Use this to add visualization tracking to any existing Flow.
-     * 
+     *
      * @param existingFlow The Flow to wrap
      * @param label Optional human-readable label
      * @return An InstrumentedFlow that tracks all operations
@@ -445,12 +452,12 @@ class VizScope(
         label: String? = null
     ): InstrumentedFlow<T> {
         val flowId = "flow-${session.nextSeq()}"
-        val coroutineId = runCatching { 
-            kotlinx.coroutines.runBlocking { 
-                currentCoroutineContext()[VizCoroutineElement]?.coroutineId 
-            } 
+        val coroutineId = runCatching {
+            kotlinx.coroutines.runBlocking {
+                currentCoroutineContext()[VizCoroutineElement]?.coroutineId
+            }
         }.getOrNull()
-        
+
         // Emit FlowCreated event
         session.send(
             FlowCreated(
@@ -464,7 +471,7 @@ class VizScope(
                 scopeId = scopeId
             )
         )
-        
+
         return InstrumentedFlow(
             delegate = existingFlow,
             session = session,
@@ -476,12 +483,12 @@ class VizScope(
 
     /**
      * Create an instrumented MutableStateFlow.
-     * 
+     *
      * StateFlow is a hot Flow that:
      * - Always has a current value
      * - Replays the current value to new collectors
      * - Emits only when value changes (distinctUntilChanged)
-     * 
+     *
      * @param initialValue The initial value of the StateFlow
      * @param label Optional human-readable label
      * @return An InstrumentedStateFlow with visualization tracking
@@ -501,12 +508,12 @@ class VizScope(
 
     /**
      * Create an instrumented MutableSharedFlow.
-     * 
+     *
      * SharedFlow is a hot Flow that:
      * - Can have multiple subscribers
      * - Supports replay cache for late subscribers
      * - Can buffer emissions with configurable overflow strategy
-     * 
+     *
      * @param replay Number of values to replay to new subscribers
      * @param extraBufferCapacity Extra buffer capacity beyond replay
      * @param onBufferOverflow Strategy for handling buffer overflow
@@ -531,9 +538,9 @@ class VizScope(
 
     /**
      * Create an instrumented interval Flow that emits values at fixed intervals.
-     * 
+     *
      * Useful for testing timing-related Flow behavior.
-     * 
+     *
      * @param periodMillis The interval between emissions in milliseconds
      * @param initialDelayMillis Optional initial delay before first emission
      * @param label Optional human-readable label
@@ -545,7 +552,7 @@ class VizScope(
         label: String? = null
     ): InstrumentedFlow<Long> {
         val flowId = "flow-interval-${session.nextSeq()}"
-        
+
         session.send(
             FlowCreated(
                 sessionId = session.sessionId,
@@ -558,7 +565,7 @@ class VizScope(
                 scopeId = scopeId
             )
         )
-        
+
         val intervalFlow = flow {
             if (initialDelayMillis > 0) {
                 delay(initialDelayMillis)
@@ -569,7 +576,7 @@ class VizScope(
                 delay(periodMillis)
             }
         }
-        
+
         return InstrumentedFlow(
             delegate = intervalFlow,
             session = session,
@@ -581,7 +588,7 @@ class VizScope(
 
     /**
      * Create an instrumented Flow from a range.
-     * 
+     *
      * @param range The range of values to emit
      * @param delayMillis Optional delay between emissions
      * @param label Optional human-readable label
@@ -593,7 +600,7 @@ class VizScope(
         label: String? = null
     ): InstrumentedFlow<Int> {
         val flowId = "flow-range-${session.nextSeq()}"
-        
+
         session.send(
             FlowCreated(
                 sessionId = session.sessionId,
@@ -606,7 +613,7 @@ class VizScope(
                 scopeId = scopeId
             )
         )
-        
+
         val rangeFlow = flow {
             for (value in range) {
                 emit(value)
@@ -615,7 +622,7 @@ class VizScope(
                 }
             }
         }
-        
+
         return InstrumentedFlow(
             delegate = rangeFlow,
             session = session,
@@ -627,7 +634,7 @@ class VizScope(
 
     /**
      * Create an instrumented Flow from a list of values.
-     * 
+     *
      * @param values The values to emit
      * @param delayMillis Optional delay between emissions
      * @param label Optional human-readable label
@@ -639,7 +646,7 @@ class VizScope(
         label: String? = null
     ): InstrumentedFlow<T> {
         val flowId = "flow-of-${session.nextSeq()}"
-        
+
         session.send(
             FlowCreated(
                 sessionId = session.sessionId,
@@ -652,7 +659,7 @@ class VizScope(
                 scopeId = scopeId
             )
         )
-        
+
         val listFlow = flow {
             for (value in values) {
                 emit(value)
@@ -661,7 +668,7 @@ class VizScope(
                 }
             }
         }
-        
+
         return InstrumentedFlow(
             delegate = listFlow,
             session = session,

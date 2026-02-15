@@ -7,6 +7,29 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.slf4j.LoggerFactory
 
+/**
+ * Real-time event distribution bus using Kotlin Flow.
+ *
+ * The EventBus provides pub/sub functionality for [VizEvent] instances,
+ * allowing multiple subscribers to receive events as they occur. It uses
+ * a [MutableSharedFlow] with a large buffer (10,000 events) to handle
+ * bursts of events without blocking emitters.
+ *
+ * If the buffer overflows, oldest events are dropped to prevent backpressure
+ * from blocking event emission. This trade-off prioritizes real-time
+ * responsiveness over guaranteed delivery.
+ *
+ * Usage:
+ * ```kotlin
+ * // Subscribe to events
+ * eventBus.stream().collect { event ->
+ *     println("Received: ${event.kind}")
+ * }
+ *
+ * // Emit events (non-blocking)
+ * eventBus.send(event)
+ * ```
+ */
 class EventBus {
     private val logger = LoggerFactory.getLogger(EventBus::class.java)
 
@@ -35,5 +58,10 @@ class EventBus {
         flow.emit(event)
     }
 
+    /**
+     * Get a Flow to subscribe to events.
+     *
+     * @return Cold flow that emits all future events
+     */
     fun stream(): Flow<VizEvent> = flow.asSharedFlow()
 }

@@ -1,10 +1,10 @@
 package com.jh.proj.coroutineviz.routes
 
-import com.jh.proj.coroutineviz.events.CoroutineCompleted
-import com.jh.proj.coroutineviz.events.CoroutineCreated
-import com.jh.proj.coroutineviz.events.CoroutineStarted
+import com.jh.proj.coroutineviz.events.coroutine.CoroutineCompleted
+import com.jh.proj.coroutineviz.events.coroutine.CoroutineCreated
+import com.jh.proj.coroutineviz.events.coroutine.CoroutineStarted
 import com.jh.proj.coroutineviz.examples.dispatcherExampleScenario
-import com.jh.proj.coroutineviz.session.VizEventMain
+import com.jh.proj.coroutineviz.examples.VizEventMain
 import com.jh.proj.coroutineviz.session.VizSession
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
