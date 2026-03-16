@@ -35,6 +35,6 @@ out/
 ### VS Code ###
 .vscode/
 /AGENTS.md
-/FLOW_DEBUG_USAGE.md
-/JOB_STATUS_TEST_GUIDE.md
+/docs/FLOW_DEBUG_USAGE.md
+/docs/JOB_STATUS_TEST_GUIDE.md
 /docs/TASKS-DEEPDIVE.md
