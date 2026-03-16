@@ -37,6 +37,10 @@ import kotlinx.coroutines.currentCoroutineContext
  * @property label Optional human-readable label
  */
 @OptIn(InternalForInheritanceCoroutinesApi::class)
+/**
+ * Deferred wrapper that emits await lifecycle events and the awaiter's
+ * suspension/resumption for visualization.
+ */
 class InstrumentedDeferred<T>(
     private val delegate: Deferred<T>,
     private val session: VizSession,
