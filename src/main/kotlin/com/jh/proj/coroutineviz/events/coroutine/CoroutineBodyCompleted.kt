@@ -4,6 +4,16 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a coroutine's own code has finished executing.
+ *
+ * This is distinct from [CoroutineCompleted] - at this point the coroutine's
+ * body has finished, but it may still be waiting for child coroutines to
+ * complete (structured concurrency). The coroutine transitions to
+ * WAITING_FOR_CHILDREN state.
+ *
+ * Lifecycle: (body execution) → BODY_COMPLETED → [CoroutineCompleted]
+ */
 @Serializable
 @SerialName("CoroutineBodyCompleted")
 data class CoroutineBodyCompleted(

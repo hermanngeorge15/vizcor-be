@@ -4,6 +4,19 @@ import com.jh.proj.coroutineviz.events.CoroutineEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a coroutine fails with an unhandled exception.
+ *
+ * This is a terminal event indicating the coroutine threw an exception
+ * that was not caught. In structured concurrency, this typically causes
+ * the parent and siblings to be cancelled as well.
+ *
+ * @property exceptionType Fully qualified exception class name
+ * @property message Exception message
+ * @property stackTrace Stack trace frames for debugging
+ *
+ * Lifecycle: (any state) → FAILED (terminal)
+ */
 @Serializable
 @SerialName("CoroutineFailed")
 data class CoroutineFailed(

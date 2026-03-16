@@ -5,7 +5,13 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Event emitted when job.join() completes (the job has finished).
+ * Emitted when [Job.join] completes and the waiting coroutine resumes.
+ *
+ * This event follows [JobJoinRequested] and indicates the job has finished
+ * (either completed, cancelled, or failed). The waiting coroutine will
+ * now resume execution.
+ *
+ * @property waitingCoroutineId ID of the coroutine that called join(), if known
  */
 @Serializable
 @SerialName("JobJoinCompleted")

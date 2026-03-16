@@ -5,8 +5,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Event emitted when a Job's state changes.
+ * Emitted when a Job's state changes.
+ *
  * Tracks the real-time state of jobs for frontend visualization.
+ * Job state is independent of coroutine state - a job can be cancelled
+ * while the coroutine is still completing its cancellation logic.
+ *
+ * @property isActive True if the job is still running
+ * @property isCompleted True if the job has finished (successfully or not)
+ * @property isCancelled True if the job was cancelled
+ * @property childrenCount Number of active child jobs
  */
 @Serializable
 @SerialName("JobStateChanged")

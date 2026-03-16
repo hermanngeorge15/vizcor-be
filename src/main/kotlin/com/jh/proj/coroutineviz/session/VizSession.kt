@@ -5,6 +5,23 @@ import com.jh.proj.coroutineviz.models.RuntimeSnapshot
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicLong
 
+/**
+ * Central container for a visualization session.
+ *
+ * A VizSession holds all the state and infrastructure needed to track coroutine
+ * execution within a single visualization context. Each session maintains:
+ * - An [EventBus] for real-time event distribution to subscribers
+ * - An [EventStore] for persistent storage of all events
+ * - A [RuntimeSnapshot] reflecting current coroutine states
+ * - A [ProjectionService] for computing derived views (timelines, hierarchies)
+ *
+ * Events flow through the session in the following order:
+ * 1. Event is appended to [store] (persistent log)
+ * 2. Event is applied to [snapshot] via [EventApplier] (state update)
+ * 3. Event is broadcast via [eventBus] (real-time notifications)
+ *
+ * @property sessionId Unique identifier for this session
+ */
 class VizSession(
     val sessionId: String
 ) {

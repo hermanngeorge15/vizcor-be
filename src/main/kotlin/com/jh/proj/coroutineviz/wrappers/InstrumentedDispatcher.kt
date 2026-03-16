@@ -7,8 +7,37 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlin.coroutines.CoroutineContext
 
 /**
- * CoroutineDispatcher wrapper that records dispatcher selection and the thread
- * that ultimately executes the runnable before delegating to the real dispatcher.
+ * CoroutineDispatcher wrapper that emits tracking events for visualization.
+ *
+ * InstrumentedDispatcher wraps a real [CoroutineDispatcher] and emits events
+ * when coroutines are dispatched and assigned to threads. This enables
+ * visualization of dispatcher behavior and thread assignment patterns.
+ *
+ * Events emitted:
+ * - [DispatcherSelected] when dispatch() is called (dispatcher chosen)
+ * - [ThreadAssigned] when the coroutine actually starts running on a thread
+ *
+ * Usage:
+ * ```kotlin
+ * val instrumentedDefault = InstrumentedDispatcher(
+ *     delegate = Dispatchers.Default,
+ *     session = session,
+ *     dispatcherId = "default",
+ *     dispatcherName = "Dispatchers.Default"
+ * )
+ *
+ * // Use in coroutine context
+ * scope.vizLaunch(context = instrumentedDefault) {
+ *     // Runs with dispatcher tracking
+ * }
+ * ```
+ *
+ * @property delegate The underlying dispatcher to delegate execution to
+ * @property session The visualization session for emitting events
+ * @property dispatcherId Unique identifier for this dispatcher instance
+ * @property dispatcherName Human-readable name for display in events
+ *
+ * @see VizDispatchers For convenient access to pre-configured instrumented dispatchers
  */
 class InstrumentedDispatcher(
     private val delegate: CoroutineDispatcher,

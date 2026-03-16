@@ -5,6 +5,19 @@ import com.jh.proj.coroutineviz.events.SuspensionPoint
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * Emitted when a coroutine suspends execution.
+ *
+ * Suspension occurs at suspension points like [delay], [await], [join],
+ * or [withContext]. The coroutine releases its thread and will be
+ * resumed later when the suspending operation completes.
+ *
+ * @property reason Why the coroutine suspended (e.g., "delay", "await", "join")
+ * @property durationMillis Expected duration if known (e.g., for delay)
+ * @property suspensionPoint Source code location where suspension occurred
+ *
+ * Lifecycle: ACTIVE → SUSPENDED → [CoroutineResumed]
+ */
 @Serializable
 @SerialName("CoroutineSuspended")
 data class CoroutineSuspended(

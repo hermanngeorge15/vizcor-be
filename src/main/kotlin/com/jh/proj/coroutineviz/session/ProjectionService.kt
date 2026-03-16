@@ -10,6 +10,27 @@ import com.jh.proj.coroutineviz.models.ThreadEvent
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Computes derived views (projections) from raw events.
+ *
+ * The ProjectionService subscribes to the [EventBus] and maintains
+ * computed views that are useful for visualization, such as:
+ * - Coroutine hierarchy trees (parent-child relationships)
+ * - Thread activity timelines (which coroutines ran on which threads)
+ * - Individual coroutine timelines with computed durations
+ *
+ * This implements the "read model" side of CQRS, where projections are
+ * optimized for specific query patterns rather than being normalized.
+ *
+ * Usage:
+ * ```kotlin
+ * val hierarchy = projectionService.getHierarchyTree()
+ * val threadActivity = projectionService.getThreadActivity()
+ * val timeline = projectionService.getCoroutineTimeline(coroutineId)
+ * ```
+ *
+ * @property session The session to subscribe to for events
+ */
 class ProjectionService(
     private val session: VizSession
 ) {
