@@ -30,6 +30,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("io.ktor:ktor-server-config-yaml")
     testImplementation("io.ktor:ktor-server-test-host")
+    testImplementation("io.ktor:ktor-client-content-negotiation")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
     
     // JUnit 5 (Jupiter) for new dispatcher tests

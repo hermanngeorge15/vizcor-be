@@ -1,6 +1,7 @@
 package com.jh.proj.coroutineviz.session
 
 import com.jh.proj.coroutineviz.events.SuspensionPoint
+import com.jh.proj.coroutineviz.events.WaitingForChildren
 import com.jh.proj.coroutineviz.events.coroutine.*
 import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
 import com.jh.proj.coroutineviz.events.job.*
@@ -233,6 +234,7 @@ fun EventContext.threadAssigned(
     threadName = threadName,
     dispatcherName = dispatcherName
 )
+
 
 fun EventContext.waitingForChildren(
     activeChildrenCount: Int,

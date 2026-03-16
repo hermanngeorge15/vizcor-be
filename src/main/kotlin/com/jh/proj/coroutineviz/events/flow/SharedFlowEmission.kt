@@ -1,5 +1,6 @@
-package com.jh.proj.coroutineviz.events
+package com.jh.proj.coroutineviz.events.flow
 
+import com.jh.proj.coroutineviz.events.VizEvent
 import kotlinx.serialization.Serializable
 
 /**

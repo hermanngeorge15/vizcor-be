@@ -16,6 +16,7 @@ import com.jh.proj.coroutineviz.session.coroutineFailed
 import com.jh.proj.coroutineviz.session.coroutineResumed
 import com.jh.proj.coroutineviz.session.coroutineStarted
 import com.jh.proj.coroutineviz.session.coroutineSuspended
+import com.jh.proj.coroutineviz.session.waitingForChildren
 import com.jh.proj.coroutineviz.session.jobStateChanged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
@@ -424,6 +425,7 @@ class VizScope(
                 activeChildrenIds = activeChildIds
             ))
         }
+    }
 
     // ========================================================================
     // Flow Builders
