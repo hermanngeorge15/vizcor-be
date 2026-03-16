@@ -8,6 +8,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.sse.*
+import kotlinx.coroutines.flow.filter
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
@@ -178,7 +179,11 @@ fun Route.registerSessionRoutes() {
         logger.info("SSE stream started for session: $sessionId")
 
         try {
-            session.bus.stream().collect { event ->
+            // 1️⃣ FIRST: Replay all stored events (history)
+            val storedEvents = session.store.all()
+            logger.info("Replaying ${storedEvents.size} stored events for session: $sessionId")
+
+            for (event in storedEvents) {
                 send(
                     ServerSentEvent(
                         data = Json.encodeToString(event),
@@ -187,6 +192,22 @@ fun Route.registerSessionRoutes() {
                     )
                 )
             }
+
+            // Track the last seq we've sent to avoid duplicates
+            val lastReplayedSeq = storedEvents.maxOfOrNull { it.seq } ?: 0L
+
+            // 2️⃣ THEN: Stream live events (filtering out already-sent ones)
+            session.bus.stream()
+                .filter { it.seq > lastReplayedSeq }
+                .collect { event ->
+                    send(
+                        ServerSentEvent(
+                            data = Json.encodeToString(event),
+                            event = event.kind,
+                            id = "${event.sessionId}-${event.seq}"
+                        )
+                    )
+                }
         } catch (e: Exception) {
             logger.error("Error in SSE stream for session $sessionId", e)
         } finally {

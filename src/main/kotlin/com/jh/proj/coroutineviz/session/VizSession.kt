@@ -1,21 +1,35 @@
 package com.jh.proj.coroutineviz.session
 
 import com.jh.proj.coroutineviz.events.CoroutineEvent
-import com.jh.proj.coroutineviz.events.JobStateChanged
+import com.jh.proj.coroutineviz.events.job.JobStateChanged
 import com.jh.proj.coroutineviz.events.VizEvent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import com.jh.proj.coroutineviz.models.RuntimeSnapshot
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.*
+import java.util.concurrent.atomic.AtomicLong
 
+/**
+ * Central container for a visualization session.
+ *
+ * A VizSession holds all the state and infrastructure needed to track coroutine
+ * execution within a single visualization context. Each session maintains:
+ * - An [EventBus] for real-time event distribution to subscribers
+ * - An [EventStore] for persistent storage of all events
+ * - A [RuntimeSnapshot] reflecting current coroutine states
+ * - A [ProjectionService] for computing derived views (timelines, hierarchies)
+ *
+ * Events flow through the session in the following order:
+ * 1. Event is appended to [store] (persistent log)
+ * 2. Event is applied to [snapshot] via [EventApplier] (state update)
+ * 3. Event is broadcast via [eventBus] (real-time notifications)
+ *
+ * @property sessionId Unique identifier for this session
+ */
 class VizSession(
     val sessionId: String
 ) {
@@ -235,3 +249,4 @@ data class SplitTimeline(
     val jobEvents: List<JobStateChanged>,
     val merged: List<VizEvent>  // Both types merged and sorted
 )
+

@@ -2,6 +2,9 @@ package com.jh.proj.coroutineviz.events
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Captures information about where a suspension occurred in user code.
+ */
 @Serializable
 data class SuspensionPoint(
     val function: String,           // Method name
@@ -10,7 +13,11 @@ data class SuspensionPoint(
     val reason: String              // "delay", "withContext", "join", "await"
 ) {
     companion object {
-        // Helper to capture from stack trace
+        /**
+         * Helper to capture suspension point from current stack trace.
+         * @param reason The reason for suspension (e.g., "delay", "await")
+         * @param skipFrames Number of stack frames to skip (default 2)
+         */
         fun capture(reason: String, skipFrames: Int = 2): SuspensionPoint {
             val stackTrace = Throwable().stackTrace
 
