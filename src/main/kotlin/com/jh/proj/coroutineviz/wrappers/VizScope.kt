@@ -1,11 +1,12 @@
 package com.jh.proj.coroutineviz.wrappers
 
-import com.jh.proj.coroutineviz.events.DeferredValueAvailable
-import com.jh.proj.coroutineviz.events.FlowCreated
-import com.jh.proj.coroutineviz.events.InstrumentedDeferred
+import com.jh.proj.coroutineviz.events.deferred.DeferredValueAvailable
+import com.jh.proj.coroutineviz.events.flow.FlowCreated
+import com.jh.proj.coroutineviz.wrappers.InstrumentedDeferred
 import com.jh.proj.coroutineviz.events.SuspensionPoint
-import com.jh.proj.coroutineviz.events.ThreadAssigned
+import com.jh.proj.coroutineviz.events.dispatcher.ThreadAssigned
 import com.jh.proj.coroutineviz.session.EventContext
+import com.jh.proj.coroutineviz.session.JobStatusMonitor
 import com.jh.proj.coroutineviz.session.VizSession
 import com.jh.proj.coroutineviz.session.coroutineBodyCompleted
 import com.jh.proj.coroutineviz.session.coroutineCancelled
@@ -15,6 +16,7 @@ import com.jh.proj.coroutineviz.session.coroutineFailed
 import com.jh.proj.coroutineviz.session.coroutineResumed
 import com.jh.proj.coroutineviz.session.coroutineStarted
 import com.jh.proj.coroutineviz.session.coroutineSuspended
+import com.jh.proj.coroutineviz.session.jobStateChanged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
@@ -55,7 +58,6 @@ class VizScope(
 ) : CoroutineScope {
 
     override val coroutineContext: CoroutineContext = context + CoroutineName("VizScope-$scopeId")
-
     /**
      * Launch a coroutine with visualization tracking while maintaining structured concurrency.
      *
@@ -110,6 +112,15 @@ class VizScope(
 
         // Launch with the viz element in context
         val job = targetScope.launch(context + vizElement) {
+            val currentJob = coroutineContext[Job] ?: throw IllegalArgumentException("Missing job")
+            // ✨ NEW: Register job for tracking
+            session.snapshot.registerJob(currentJob, coroutineId)
+
+            // ✨ NEW: Optionally track with monitor
+            session.jobMonitor.track(currentJob, jobId, coroutineId)
+
+            // register currentJob with coroutineId
+            session.snapshot.registerJob(currentJob,coroutineId)
             // ✅ EMIT: CoroutineCreated
             session.send(ctx.coroutineCreated())
 
@@ -134,6 +145,8 @@ class VizScope(
             )
 
             block()
+
+            checkAndSendJobStateEvent(currentJob, ctx)
 
             // Emit CoroutineBodyCompleted - the coroutine's own code has finished
             // AND all children have completed (due to coroutineScope above)
@@ -163,6 +176,12 @@ class VizScope(
                     // Note: In practice, this rarely happens because coroutineScope
                     // converts exceptions to CancellationException
                     session.send(ctx.coroutineFailed(cause::class.simpleName, cause.message))
+                    session.send(ctx.jobStateChanged(
+                        isActive = false,
+                        isCompleted = false,
+                        isCancelled = true,
+                        childrenCount = coroutineContext[Job]?.children?.count() ?: 0
+                    ))
                 }
 
                 cause is CancellationException || job.isCancelled -> {
@@ -171,6 +190,12 @@ class VizScope(
                     // - Explicit cancellation
                     // - Parent cancelled
                     session.send(ctx.coroutineCancelled(cause.message ?: "CancellationException"))
+                    session.send(ctx.jobStateChanged(
+                        isActive = false,
+                        isCompleted = false,
+                        isCancelled = true,
+                        childrenCount = coroutineContext[Job]?.children?.count() ?: 0
+                    ))
                 }
 
                 else -> {
@@ -217,6 +242,12 @@ class VizScope(
             label = label
         )
 
+        // ✨ NEW: Register job
+        val currentJob = coroutineContext[Job]!!
+        session.snapshot.registerJob(currentJob, coroutineId)
+        session.jobMonitor.track(currentJob, jobId, coroutineId)
+
+
         // Check if we're in a nested context (inside another vizLaunch/vizAsync)
         // If so, use current scope; otherwise use VizScope
         val targetScope = currentCoroutineContext()[VizCoroutineElement]?.let {
@@ -225,6 +256,9 @@ class VizScope(
 
         // Use async{} instead of launch{}
         val deferred = targetScope.async(context + vizElement) {
+
+            val currentJob = coroutineContext[Job] ?: throw IllegalArgumentException("Missing job")
+
             // Emit lifecycle events (similar to vizLaunch)
             session.send(ctx.coroutineCreated())
             session.send(ctx.coroutineStarted())
@@ -246,6 +280,8 @@ class VizScope(
             )
             // Execute block
             val result = block()
+
+            checkAndSendJobStateEvent(currentJob, ctx)
 
             // Emit body completed
             session.sent(
@@ -371,6 +407,23 @@ class VizScope(
     fun cancel() {
         coroutineContext[Job]?.cancel()
     }
+
+    private fun checkAndSendJobStateEvent(job: Job, ctx: EventContext) {
+        val hasActiveChildren = job.children.any { it.isActive }
+        if (hasActiveChildren) {
+            val activeChildren = job.children.filter { it.isActive }.map { it.job }.toList()
+            // Get child coroutine IDs from their contexts
+            val activeChildIds = activeChildren.mapNotNull { childJob ->
+                // Try to extract coroutineId from child job
+                // This requires tracking job->coroutineId mapping
+                session.snapshot.getCoroutineIdFromJob(childJob)
+            }
+
+            session.send(ctx.waitingForChildren(
+                activeChildrenCount = activeChildren.count(),
+                activeChildrenIds = activeChildIds
+            ))
+        }
 
     // ========================================================================
     // Flow Builders
@@ -676,5 +729,6 @@ class VizScope(
             flowType = "FlowOf",
             label = label ?: "flowOf(${values.size} items)"
         )
+
     }
 }
