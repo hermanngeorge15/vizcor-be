@@ -49,7 +49,7 @@ import kotlin.coroutines.EmptyCoroutineContext
  * @param scopeId Unique identifier for this scope
  */
 class VizScope(
-    private val session: VizSession,
+    internal val session: VizSession,
     context: CoroutineContext = EmptyCoroutineContext,
     val scopeId: String = "scope-${session.nextSeq()}"
 ) : CoroutineScope {
