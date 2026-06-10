@@ -1,5 +1,9 @@
 # Kotlin Coroutines Visualizer - Backend
 
+> ⚠️ **This repository has moved.** Active development now happens in the monorepo:
+> **[Kotlin-server-squad/vizcore](https://github.com/Kotlin-server-squad/vizcore)** (see `backend/`).
+> This standalone repo is retained for history only and is no longer maintained.
+
 A powerful **real-time debugging and visualization backend** for Kotlin coroutines. This Ktor-based server tracks, stores, and streams coroutine lifecycle events, job states, thread activity, and suspension points to help developers understand and debug complex concurrent Kotlin applications.
 
 ## 🎯 What Does It Do?
